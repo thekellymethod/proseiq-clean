@@ -1,0 +1,78 @@
+{
+  "name": "Motion",
+  "type": "object",
+  "properties": {
+    "case_id": {
+      "type": "string"
+    },
+    "title": {
+      "type": "string"
+    },
+    "motion_type": {
+      "type": "string",
+      "enum": [
+        "dismiss",
+        "summary_judgment",
+        "compel",
+        "suppress",
+        "limine",
+        "continuance",
+        "reconsideration",
+        "default_judgment",
+        "protective_order",
+        "sanctions",
+        "other"
+      ]
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "drafting",
+        "review",
+        "filed",
+        "pending",
+        "granted",
+        "denied",
+        "withdrawn"
+      ],
+      "default": "drafting"
+    },
+    "content": {
+      "type": "string",
+      "description": "Full motion text"
+    },
+    "arguments": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "supporting_case_law": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "citation": {
+            "type": "string"
+          },
+          "relevance": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "filing_deadline": {
+      "type": "string",
+      "format": "date"
+    },
+    "hearing_date": {
+      "type": "string",
+      "format": "date"
+    }
+  },
+  "required": [
+    "case_id",
+    "title",
+    "motion_type"
+  ]
+}

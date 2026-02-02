@@ -1,0 +1,40 @@
+{
+  "name": "Template",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string"
+    },
+    "category": {
+      "type": "string",
+      "enum": [
+        "motion",
+        "pleading",
+        "discovery",
+        "notice",
+        "brief",
+        "letter",
+        "contract",
+        "other"
+      ]
+    },
+    "content": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "variables": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Placeholder variables in the template"
+    }
+  },
+  "required": [
+    "name",
+    "category",
+    "content"
+  ]
+}

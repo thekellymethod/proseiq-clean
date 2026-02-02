@@ -13,4 +13,3 @@ export async function getAuth() {
   return { user: data.user, userId: data.user.id, supabase };
 }
 
-!

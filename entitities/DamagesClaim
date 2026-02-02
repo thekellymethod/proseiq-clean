@@ -1,0 +1,49 @@
+{
+  "name": "DamagesClaim",
+  "type": "object",
+  "properties": {
+    "case_id": {
+      "type": "string"
+    },
+    "claim_type": {
+      "type": "string",
+      "enum": [
+        "compensatory",
+        "punitive",
+        "economic",
+        "non_economic",
+        "medical_expenses",
+        "lost_wages",
+        "property_damage",
+        "pain_suffering",
+        "emotional_distress",
+        "loss_of_consortium",
+        "other"
+      ]
+    },
+    "amount": {
+      "type": "number"
+    },
+    "description": {
+      "type": "string"
+    },
+    "legal_basis": {
+      "type": "string"
+    },
+    "supporting_evidence": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "probability_of_recovery": {
+      "type": "number",
+      "description": "Percentage 0-100"
+    }
+  },
+  "required": [
+    "case_id",
+    "claim_type",
+    "amount"
+  ]
+}

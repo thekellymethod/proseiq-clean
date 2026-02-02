@@ -1,0 +1,63 @@
+{
+  "name": "Filing",
+  "type": "object",
+  "properties": {
+    "case_id": {
+      "type": "string"
+    },
+    "filing_type": {
+      "type": "string",
+      "enum": [
+        "complaint",
+        "answer",
+        "motion",
+        "brief",
+        "notice",
+        "subpoena",
+        "discovery_request",
+        "response",
+        "appeal",
+        "other"
+      ]
+    },
+    "title": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "preparing",
+        "ready",
+        "filed",
+        "served",
+        "rejected"
+      ],
+      "default": "preparing"
+    },
+    "deadline": {
+      "type": "string",
+      "format": "date"
+    },
+    "filed_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "confirmation_number": {
+      "type": "string"
+    },
+    "served_parties": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "notes": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "case_id",
+    "filing_type",
+    "title"
+  ]
+}

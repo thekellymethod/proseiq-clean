@@ -1,0 +1,55 @@
+{
+  "name": "DevilsAdvocate",
+  "type": "object",
+  "properties": {
+    "case_id": {
+      "type": "string"
+    },
+    "argument": {
+      "type": "string",
+      "description": "The argument being challenged"
+    },
+    "counterarguments": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "point": {
+            "type": "string"
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "low",
+              "medium",
+              "high"
+            ]
+          },
+          "suggested_response": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "weaknesses_identified": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "strength_score": {
+      "type": "number",
+      "description": "Argument strength 0-100"
+    },
+    "recommendations": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "required": [
+    "case_id",
+    "argument"
+  ]
+}

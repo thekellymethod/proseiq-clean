@@ -1,0 +1,47 @@
+{
+  "name": "CaseLaw",
+  "type": "object",
+  "properties": {
+    "case_id": {
+      "type": "string",
+      "description": "Reference to the case this law is applied to"
+    },
+    "citation": {
+      "type": "string",
+      "description": "Full legal citation"
+    },
+    "case_name": {
+      "type": "string"
+    },
+    "court": {
+      "type": "string"
+    },
+    "year": {
+      "type": "number"
+    },
+    "holding": {
+      "type": "string",
+      "description": "Key holding of the case"
+    },
+    "relevance": {
+      "type": "string",
+      "description": "How this case law applies"
+    },
+    "key_quotes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "legal_principles": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "required": [
+    "citation",
+    "case_name"
+  ]
+}

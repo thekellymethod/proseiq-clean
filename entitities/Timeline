@@ -1,0 +1,56 @@
+{
+  "name": "Timeline",
+  "type": "object",
+  "properties": {
+    "case_id": {
+      "type": "string"
+    },
+    "event_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "event_type": {
+      "type": "string",
+      "enum": [
+        "incident",
+        "filing",
+        "discovery",
+        "motion",
+        "hearing",
+        "deposition",
+        "settlement_discussion",
+        "trial",
+        "deadline",
+        "correspondence",
+        "other"
+      ]
+    },
+    "title": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "parties_involved": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "importance": {
+      "type": "string",
+      "enum": [
+        "low",
+        "medium",
+        "high",
+        "critical"
+      ],
+      "default": "medium"
+    }
+  },
+  "required": [
+    "case_id",
+    "event_date",
+    "title"
+  ]
+}

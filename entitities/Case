@@ -1,0 +1,110 @@
+{
+  "name": "Case",
+  "type": "object",
+  "properties": {
+    "case_number": {
+      "type": "string",
+      "description": "Official case number"
+    },
+    "title": {
+      "type": "string",
+      "description": "Case title (e.g., Smith v. Jones)"
+    },
+    "client_name": {
+      "type": "string"
+    },
+    "opposing_party": {
+      "type": "string"
+    },
+    "case_type": {
+      "type": "string",
+      "enum": [
+        "civil",
+        "criminal",
+        "family",
+        "corporate",
+        "intellectual_property",
+        "employment",
+        "real_estate",
+        "bankruptcy",
+        "personal_injury",
+        "other"
+      ]
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "intake",
+        "discovery",
+        "motions",
+        "trial_prep",
+        "trial",
+        "appeal",
+        "closed",
+        "settled"
+      ],
+      "default": "intake"
+    },
+    "court": {
+      "type": "string"
+    },
+    "judge": {
+      "type": "string"
+    },
+    "filing_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "trial_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "statute_of_limitations": {
+      "type": "string",
+      "format": "date",
+      "description": "Deadline for filing under statute of limitations"
+    },
+    "incident_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Date of incident/occurrence"
+    },
+    "description": {
+      "type": "string"
+    },
+    "key_facts": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "legal_issues": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "our_position": {
+      "type": "string",
+      "enum": [
+        "plaintiff",
+        "defendant"
+      ]
+    },
+    "priority": {
+      "type": "string",
+      "enum": [
+        "low",
+        "medium",
+        "high",
+        "urgent"
+      ],
+      "default": "medium"
+    }
+  },
+  "required": [
+    "title",
+    "client_name",
+    "case_type"
+  ]
+}

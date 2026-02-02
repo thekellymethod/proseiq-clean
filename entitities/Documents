@@ -1,0 +1,56 @@
+{
+  "name": "Document",
+  "type": "object",
+  "properties": {
+    "case_id": {
+      "type": "string",
+      "description": "Reference to the case"
+    },
+    "name": {
+      "type": "string"
+    },
+    "document_type": {
+      "type": "string",
+      "enum": [
+        "pleading",
+        "motion",
+        "brief",
+        "discovery",
+        "evidence",
+        "correspondence",
+        "court_order",
+        "notice",
+        "contract",
+        "deposition",
+        "exhibit",
+        "other"
+      ]
+    },
+    "file_url": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "draft",
+        "review",
+        "final",
+        "filed",
+        "served"
+      ],
+      "default": "draft"
+    },
+    "filing_deadline": {
+      "type": "string",
+      "format": "date"
+    },
+    "notes": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "case_id",
+    "name",
+    "document_type"
+  ]
+}
