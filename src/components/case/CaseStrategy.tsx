@@ -40,7 +40,6 @@ export default function CaseStrategy({
       <div className="mt-4 grid gap-4 lg:grid-cols-3">
         <Card title="Theory of the case">
           <textarea
-            placeholder="Defendant violated statutory notice requirements, then leveraged improper fees and reporting to force an unlawful deficiency."
             title="Theory of the case"
             value={theory}
             onChange={(e) => setTheory(e.target.value)}
@@ -56,7 +55,6 @@ export default function CaseStrategy({
 
         <Card title="Goals">
           <textarea
-            placeholder="1) Immediate relief/settlement leverage\n2) Remove negative reporting\n3) Recover fees and damages\n4) Position for summary disposition"
             title="Goals"
             value={goals}
             onChange={(e) => setGoals(e.target.value)}
@@ -72,8 +70,8 @@ export default function CaseStrategy({
 
         <Card title="Proof map">
           <textarea
-            placeholder="- Contract terms\n- Payment ledger + bank records\n- Notice defects\n- Repo invoice\n- Sale irregularities\n- Credit disputes + continued reporting"
             title="Proof map"
+            placeholder="- Contract terms\n- Payment ledger + bank records\n- Notice defects\n- Repo invoice\n- Sale irregularities\n- Credit disputes + continued reporting"
             value={proof}
             onChange={(e) => setProof(e.target.value)}
             disabled={!!readOnly}
