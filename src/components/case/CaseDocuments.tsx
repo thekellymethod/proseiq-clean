@@ -181,6 +181,7 @@ export default function CaseDocuments({
             <div className="space-y-1">
               <label className="text-xs text-white/70">Type</label>
               <select
+                title="Type"
                 value={kind}
                 onChange={(e) => setKind(e.target.value as any)}
                 disabled={!!readOnly}

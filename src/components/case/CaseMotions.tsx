@@ -122,6 +122,7 @@ export default function CaseMotions({
             <div className="space-y-1">
               <label className="text-xs text-white/70">Status</label>
               <select
+                title="Status"
                 value={status}
                 onChange={(e) => setStatus(e.target.value as any)}
                 disabled={!!readOnly}

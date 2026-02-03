@@ -19,6 +19,8 @@ export default async function EditCasePage({ params }: { params: { id: string } 
         <div className="space-y-1">
           <label className="text-xs text-white/70">Title</label>
           <input
+            title="Title"
+            placeholder="e.g., Vehicle repossessed"
             name="title"
             defaultValue={c.title}
             className="w-full rounded-md border border-white/10 bg-black/20 px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-amber-300/30"

@@ -160,6 +160,7 @@ export default function CaseFiling({
             <div className="space-y-1">
               <label className="text-xs text-white/70">Court</label>
               <input
+                title="Court"
                 value={court}
                 onChange={(e) => setCourt(e.target.value)}
                 disabled={!!readOnly}
@@ -175,6 +176,7 @@ export default function CaseFiling({
             <div className="space-y-1">
               <label className="text-xs text-white/70">Status</label>
               <select
+                title="Status"
                 value={status}
                 onChange={(e) => setStatus(e.target.value as any)}
                 disabled={!!readOnly}
