@@ -98,7 +98,7 @@ export default function DevilsAdvocate({
           </button>
 
           <div className="mt-3 text-xs text-white/50">
-            This panel should be wired to your AI endpoint next. No Base44 required.
+            This panel should be wired to your AI endpoint next. No tsx required.
           </div>
         </div>
 

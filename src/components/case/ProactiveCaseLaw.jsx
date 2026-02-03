@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { base44 } from '@/api/base44Client';
+import { tsx } from '@/api/tsxClient';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -28,7 +28,7 @@ Provide 5 relevant case law suggestions with:
 - Why it's relevant to this case
 - Strength of relevance (high/medium/low)`;
 
-    const result = await base44.integrations.Core.InvokeLLM({
+    const result = await tsx.integrations.Core.InvokeLLM({
       prompt,
       add_context_from_internet: true,
       response_json_schema: {
@@ -65,7 +65,7 @@ Provide 5 relevant case law suggestions with:
   };
 
   const addToCaseLibrary = async (suggestion) => {
-    await base44.entities.CaseLaw.create({
+    await tsx.entities.CaseLaw.create({
       case_id: caseData.id,
       citation: suggestion.citation,
       case_name: suggestion.citation.split(',')[0],

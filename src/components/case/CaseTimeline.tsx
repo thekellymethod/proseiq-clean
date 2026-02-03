@@ -122,6 +122,7 @@ export default function CaseTimeline({
             <div className="space-y-1">
               <label className="text-xs text-white/70">Date</label>
               <input
+                title="Date"
                 type="date"
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
@@ -154,6 +155,7 @@ export default function CaseTimeline({
             <div className="space-y-1">
               <label className="text-xs text-white/70">Tag</label>
               <select
+                title="Tag"
                 value={tag}
                 onChange={(e) => setTag(e.target.value as any)}
                 disabled={!!readOnly}

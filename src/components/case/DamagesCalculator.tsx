@@ -169,17 +169,13 @@ export default function DamagesCalculator({
 
             <div className="space-y-1">
               <label className="text-xs text-white/70">Category</label>
-              <select
-                value={category}
-                onChange={(e) => setCategory(e.target.value as any)}
-                disabled={!!readOnly}
-                className={cx(
-                  "w-full rounded-md border px-3 py-2 text-sm",
-                  "border-white/10 bg-black/20 text-white",
-                  "focus:outline-none focus:ring-2 focus:ring-amber-300/30",
-                  readOnly && "opacity-60"
-                )}
-              >
+              <select title="Category" value={category} onChange={(e) => setCategory(e.target.value as LineItem["category"])} disabled={!!readOnly} className={cx(
+                "w-full rounded-md border px-3 py-2 text-sm",
+                "border-white/10 bg-black/20 text-white",
+                "focus:outline-none focus:ring-2 focus:ring-amber-300/30",
+                readOnly && "opacity-60"
+              )}>
+                <option value="economic">economic</option>
                 <option value="economic">economic</option>
                 <option value="fees">fees</option>
                 <option value="transportation">transportation</option>
