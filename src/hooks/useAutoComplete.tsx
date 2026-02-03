@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { useAutoComplete } from "@/hooks/useAutoComplete";
 import { createClient } from "@/utils/supabase/client";
 
-
 export default function LoginForm() {
   const router = useRouter();
 
@@ -20,8 +19,6 @@ export default function LoginForm() {
   const blurTimer = useRef<number | null>(null);
 
   const { suggestions, rememberEmail, removeEmail } = useAutoComplete(email, {
-    email: email,
-    password: password,
     storageKey: "proseiq:loginEmails",
     limit: 7,
   });
