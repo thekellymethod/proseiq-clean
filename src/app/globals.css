@@ -1,0 +1,17 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --navy: #0a1931;
+  --gold: #f5c242;
+}
+
+body {
+  /* Create a top-to-bottom gradient */
+  background: linear-gradient(to bottom, var(--navy), var(--gold));
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+  min-height: 100vh;
+  margin: 0;
+}
