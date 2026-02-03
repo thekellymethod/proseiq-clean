@@ -95,7 +95,7 @@ export default function CaseDocuments({
 
   React.useEffect(() => {
     load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
   }, [caseId]);
 
   return (
