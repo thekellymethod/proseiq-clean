@@ -1,5 +1,6 @@
 import { createClient } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
+import { requireUser } from "@/lib/auth/getAuth";
 
 export type CaseRow = {
   id: string;
@@ -43,16 +44,32 @@ export async function getCaseById(id: string) {
   return data as CaseRow;
 }
 
-export async function createCase(title: string) {
+export async function createCase(input: {
+  title: string;
+  case_type: string;
+  status?: string;
+  court?: string;
+  judge?: string;
+  case_number?: string;
+}) {
   const { supabase, user } = await requireUser();
+
   const { data, error } = await supabase
     .from("cases")
-    .insert({ title, user_id: user.id })
-    .select("id,title,created_at,user_id")
+    .insert({
+      user_id: user.id,              // ✅ critical for RLS
+      title: input.title,
+      case_type: input.case_type,
+      status: input.status ?? "intake",
+      court: input.court ?? null,
+      judge: input.judge ?? null,
+      case_number: input.case_number ?? null,
+    })
+    .select("*")
     .single();
 
   if (error) throw new Error(error.message);
-  return data as CaseRow;
+  return data;
 }
 
 export async function updateCase(id: string, title: string) {

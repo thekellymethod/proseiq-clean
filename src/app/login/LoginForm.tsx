@@ -2,9 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useAutoComplete } from "@/hooks/useAutoComplete";
 import { createClient } from "@/utils/supabase/client";
-
 
 export default function LoginForm() {
   const router = useRouter();
@@ -17,23 +15,6 @@ export default function LoginForm() {
   const [msg, setMsg] = useState<string | null>(null);
 
   const [open, setOpen] = useState(false);
-  const blurTimer = useRef<number | null>(null);
-
-  const { suggestions, rememberEmail, removeEmail } = useAutoComplete(email, {
-    email: email,
-    password: password,
-    storageKey: "proseiq:loginEmails",
-    limit: 7,
-  });
-
-  useEffect(() => {
-    setOpen(Boolean(email.trim()) && suggestions.length > 0);
-  }, [email, suggestions.length]);
-
-  function safeCloseDropdown() {
-    if (blurTimer.current) window.clearTimeout(blurTimer.current);
-    blurTimer.current = window.setTimeout(() => setOpen(false), 120);
-  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -48,7 +29,6 @@ export default function LoginForm() {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
 
-        rememberEmail(email);
         router.replace("/dashboard");
         router.refresh();
         return;
@@ -57,7 +37,6 @@ export default function LoginForm() {
       const { error } = await supabase.auth.signUp({ email, password });
       if (error) throw error;
 
-      rememberEmail(email);
       setMsg("Account created. If email confirmation is enabled, check your inbox. Then sign in.");
       setMode("signin");
       setPassword("");
@@ -70,15 +49,13 @@ export default function LoginForm() {
 
   return (
     <form onSubmit={submit} className="space-y-3">
-      <div className="grid gap-2 relative">
+      <div className="relative grid gap-2">
         <label className="text-xs text-white/70">Email</label>
 
         <input
           className="w-full rounded-md border border-white/10 bg-black/30 px-3 py-2 text-white outline-none focus:border-amber-300/40"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          onFocus={() => setOpen(Boolean(email.trim()) && suggestions.length > 0)}
-          onBlur={safeCloseDropdown}
           autoComplete="email"
           placeholder="you@email.com"
           required
@@ -87,34 +64,31 @@ export default function LoginForm() {
         {open && (
           <div
             className="absolute top-[64px] z-20 w-full overflow-hidden rounded-md border border-white/10 bg-black/80 backdrop-blur"
-            onMouseDown={(e) => e.preventDefault()} // keeps input from losing focus before click
+            onMouseDown={(e) => e.preventDefault()}
           >
-            {suggestions.map((s) => (
               <div
-                key={s}
                 className="flex items-center justify-between gap-2 px-3 py-2 text-sm hover:bg-white/10"
               >
                 <button
                   type="button"
                   className="flex-1 text-left"
                   onClick={() => {
-                    setEmail(s);
+                    setEmail("test@test.com");
                     setOpen(false);
                   }}
                 >
-                  {s}
+                  test@test.com
                 </button>
 
                 <button
                   type="button"
                   className="rounded px-2 py-1 text-xs text-white/60 hover:text-white"
                   title="Remove"
-                  onClick={() => removeEmail(s)}
+                  onClick={() => {}}
                 >
                   ✕
                 </button>
               </div>
-            ))}
           </div>
         )}
       </div>
