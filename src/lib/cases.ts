@@ -1,4 +1,5 @@
 import { createClient } from "@/utils/supabase/server";
+import { redirect } from "next/navigation";
 
 export type CaseRow = {
   id: string;
@@ -9,10 +10,12 @@ export type CaseRow = {
 
 export async function requireUser() {
   const supabase = await createClient();
-  const { data, error } = await supabase.auth.getUser();
-  if (error) throw new Error(error.message);
-  if (!data?.user) throw new Error("Unauthorized");
+  const { data } = await supabase.auth.getUser();
+ 
+  if (!data?.user) redirect("/login");
+
   return { supabase, user: data.user };
+
 }
 
 export async function listCases() {
