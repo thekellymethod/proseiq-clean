@@ -1,6 +1,6 @@
-//template.jsx
-import Link from "next/link";
-import SignOutButton from "@/components/SignOutButton";
+import React from "react";
+import AppHeader from "@/components/layout/AppHeader";
+import BackgroundFX from "@/components/marketing/BackgroundFX";
 
 export default function Template({
   title,
@@ -15,28 +15,19 @@ export default function Template({
 }) {
   return (
     <div className="min-h-screen text-white">
-      <div className="fixed inset-0 -z-10 bg-gradient-to-b from-[#071225] via-[#0B1B3A] to-[#B8891A]" />
-      <div className="fixed inset-0 -z-10 bg-black/40" />
+      <BackgroundFX />
+      <AppHeader />
 
-      <header className="border-b border-white/10 bg-black/20 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4">
-          <Link href="/dashboard" className="font-semibold tracking-wide">
-            Prose<span className="text-amber-300">IQ</span>
-          </Link>
-          <div className="flex gap-2">
-            {actions}
-            <SignOutButton />
+      <main className="mx-auto max-w-6xl px-4 py-6">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0">
+            <h1 className="text-2xl font-semibold tracking-tight text-white">{title}</h1>
+            {subtitle ? <p className="mt-1 text-sm text-white/70">{subtitle}</p> : null}
           </div>
+          {actions ? <div className="shrink-0">{actions}</div> : null}
         </div>
-      </header>
 
-      <main className="mx-auto max-w-7xl px-4 py-6">
-        <h1 className="text-xl font-semibold">{title}</h1>
-        {subtitle && <p className="mt-1 text-sm text-white/70">{subtitle}</p>}
-
-        <section className="mt-6 rounded-2xl border border-white/10 bg-white/5 p-5 backdrop-blur">
-          {children}
-        </section>
+        <div className="mt-6">{children}</div>
       </main>
     </div>
   );

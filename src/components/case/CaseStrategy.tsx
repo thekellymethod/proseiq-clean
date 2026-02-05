@@ -1,3 +1,4 @@
+//src/components/case/CaseStrategy.tsx
 "use client";
 
 import React from "react";

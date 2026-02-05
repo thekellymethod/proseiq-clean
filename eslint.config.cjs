@@ -2,19 +2,20 @@ const {
     defineConfig,
 } = require("eslint/config");
 
-const js = require("@eslint/js");
-
 const {
-    FlatCompat,
-} = require("@eslint/eslintrc");
+    plugins = [
+        "react-hooks"
+    ],
+    rules = {
+      "react-hooks/rules-of-hooks": "error",
+      "react-hooks/exhaustive-deps": "warn"
+    },
+    extends : ["next/core-web-vitals"],
+  } = require("eslint-plugin-react-hooks");
 
-const compat = new FlatCompat({
-    baseDirectory: __dirname,
-    recommendedConfig: js.configs.recommended,
-    allConfig: js.configs.all
+module.exports = defineConfig({
+    plugins: plugins,
+    rules: rules,
+    extends: extends
 });
-
-module.exports = defineConfig([{
-    extends: compat.extends("next/core-web-vitals"),
-}]);
   

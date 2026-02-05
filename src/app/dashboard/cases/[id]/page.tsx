@@ -2,14 +2,14 @@ import { redirect } from "next/navigation";
 import Template from "@/components/layout/Template";
 import { getCaseById, updateCase } from "@/lib/cases";
 
-export default async function EditCasePage({ params }: { params: { id: string } }) {
+export default async function CasePage({ params }: { params: { id: string } }) {
   const c = await getCaseById(params.id);
 
   async function action(formData: FormData) {
     "use server";
-    const title = String(formData.get("title") || "").trim();
+    const title = String(formData.get("title") ?? "").trim();
     if (!title) return;
-    await updateCase(params.id, title);
+    await updateCase(params.id, { title });
     redirect(`/dashboard/cases/${params.id}`);
   }
 

@@ -1,10 +1,4 @@
-import TopNav from "@/components/layout/TopNav";
-
+// src/app/dashboard/layout.tsx
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="min-h-screen">
-      <TopNav />
-      {children}
-    </div>
-  );
+  return <>{children}</>;
 }
