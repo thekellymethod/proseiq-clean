@@ -1,7 +1,8 @@
 import Template from "@/components/layout/Template";
 import { getCaseById } from "@/lib/cases";
 
-export default async function CaseAnalysisPage({ params }: { params: { id: string } }) {
+export default async function CaseAnalysisPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const c = await getCaseById(params.id);
 
   return (

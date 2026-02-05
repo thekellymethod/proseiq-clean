@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 
-export async function GET(_: Request, { params }: { params: { draftId: string } }) {
+export async function GET(_: Request, props: { params: Promise<{ draftId: string }> }) {
+  const params = await props.params;
   const supabase = await createClient();
   const { data: auth } = await supabase.auth.getUser();
   if (!auth?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -16,7 +17,8 @@ export async function GET(_: Request, { params }: { params: { draftId: string } 
   return NextResponse.json({ item: data });
 }
 
-export async function PATCH(req: Request, { params }: { params: { draftId: string } }) {
+export async function PATCH(req: Request, props: { params: Promise<{ draftId: string }> }) {
+  const params = await props.params;
   const supabase = await createClient();
   const { data: auth } = await supabase.auth.getUser();
   if (!auth?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -38,7 +40,8 @@ export async function PATCH(req: Request, { params }: { params: { draftId: strin
   return NextResponse.json({ item: data });
 }
 
-export async function POST(req: Request, { params }: { params: { draftId: string } }) {
+export async function POST(req: Request, props: { params: Promise<{ draftId: string }> }) {
+  const params = await props.params;
   // POST = snapshot version
   const supabase = await createClient();
   const { data: auth } = await supabase.auth.getUser();
@@ -62,7 +65,8 @@ export async function POST(req: Request, { params }: { params: { draftId: string
   return NextResponse.json({ item: data });
 }
 
-export async function DELETE(_: Request, { params }: { params: { draftId: string } }) {
+export async function DELETE(_: Request, props: { params: Promise<{ draftId: string }> }) {
+  const params = await props.params;
   const supabase = await createClient();
   const { data: auth } = await supabase.auth.getUser();
   if (!auth?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

@@ -1,225 +1,198 @@
-//src/components/case/CaseDocuments.tsx
+
 "use client";
 
 import React from "react";
 
-type FileRow = {
+type DocRow = {
   id: string;
   filename: string;
-  mime: string | null;
-  size: number | null;
-  status: string;
-  tags: string[];
-  notes: string | null;
+  content_type: string | null;
+  bytes: number | null;
+  storage_bucket: string;
+  storage_path: string;
   created_at: string;
-  updated_at: string;
+  notes: string | null;
+  tags: string[];
 };
 
-function fmtBytes(n?: number | null) {
-  if (!n) return "—";
-  const kb = n / 1024;
-  if (kb < 1024) return `${kb.toFixed(1)} KB`;
-  const mb = kb / 1024;
-  return `${mb.toFixed(1)} MB`;
+async function jsonFetch(url: string, init?: RequestInit) {
+  const res = await fetch(url, { ...init, headers: { "Content-Type": "application/json", ...(init?.headers || {}) } });
+  const j = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(j?.error || `Request failed (${res.status})`);
+  return j;
+}
+
+function fmtBytes(n: number | null) {
+  if (!n && n !== 0) return "—";
+  const u = ["B", "KB", "MB", "GB"];
+  let x = n;
+  let i = 0;
+  while (x >= 1024 && i < u.length - 1) {
+    x /= 1024;
+    i++;
+  }
+  return `${x.toFixed(i === 0 ? 0 : 1)} ${u[i]}`;
+}
+
+function fmtDate(iso: string) {
+  try {
+    return new Date(iso).toLocaleString();
+  } catch {
+    return iso;
+  }
 }
 
 export default function CaseDocuments({ caseId }: { caseId: string }) {
-  const [items, setItems] = React.useState<FileRow[]>([]);
-  const [busy, setBusy] = React.useState(false);
-  const fileInputRef = React.useRef<HTMLInputElement | null>(null);
+  const [items, setItems] = React.useState<DocRow[]>([]);
+  const [error, setError] = React.useState<string | null>(null);
+  const [loading, setLoading] = React.useState(true);
+  const [uploading, setUploading] = React.useState(false);
 
-  async function load() {
-    const r = await fetch(`/api/cases/${caseId}/files`, { cache: "no-store" });
-    const j = await r.json();
-    setItems(j.items ?? []);
+  async function refresh() {
+    setError(null);
+    setLoading(true);
+    try {
+      const j = await jsonFetch(`/api/cases/${caseId}/documents`, { method: "GET" });
+      setItems(j.items ?? []);
+    } catch (e: any) {
+      setError(e?.message ?? "Failed");
+    } finally {
+      setLoading(false);
+    }
   }
 
   React.useEffect(() => {
-    load();
+    refresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [caseId]);
 
-  async function download(fileId: string) {
-    const r = await fetch(`/api/files/${fileId}/download-url`, { cache: "no-store" });
-    const j = await r.json();
-    if (j.url) window.open(j.url, "_blank", "noopener,noreferrer");
-  }
-
-  async function update(fileId: string, patch: any) {
-    await fetch(`/api/files/${fileId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(patch),
-    });
-    await load();
-  }
-
-  async function remove(fileId: string) {
-    if (!confirm("Delete this file?")) return;
-    await fetch(`/api/files/${fileId}`, { method: "DELETE" });
-    await load();
-  }
-
-  async function uploadSelected(files: FileList | null) {
-    if (!files || files.length === 0) return;
-    setBusy(true);
-
+  async function uploadOne(file: File) {
+    setError(null);
+    setUploading(true);
     try {
-      for (const f of Array.from(files)) {
-        // 1) Create DB row
-        const created = await fetch(`/api/cases/${caseId}/files`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ filename: f.name, mime: f.type || null, size: f.size, tags: [], status: "draft" }),
-        }).then((r) => r.json());
+      const up = await jsonFetch(`/api/cases/${caseId}/documents/signed-upload`, {
+        method: "POST",
+        body: JSON.stringify({ filename: file.name, content_type: file.type || "application/octet-stream", bytes: file.size }),
+      });
 
-        const row = created.item;
-        if (!row?.id) continue;
+      const putRes = await fetch(up.signedUrl, {
+        method: "PUT",
+        headers: { "Content-Type": file.type || "application/octet-stream" },
+        body: file,
+      });
 
-        // 2) Get signed upload url
-        const signed = await fetch(`/api/files/${row.id}/upload-url`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ contentType: f.type || "application/octet-stream" }),
-        }).then((r) => r.json());
-
-        if (!signed?.url) continue;
-
-        // 3) Upload bytes to signed URL
-        const up = await fetch(signed.url, {
-          method: "PUT",
-          headers: { "Content-Type": f.type || "application/octet-stream" },
-          body: f,
-        });
-
-        if (!up.ok) {
-          // mark rejected or keep draft
-          await update(row.id, { status: "rejected", notes: `Upload failed: ${up.status}` });
-        } else {
-          await update(row.id, { status: "pending_review" });
-        }
+      if (!putRes.ok) {
+        const t = await putRes.text().catch(() => "");
+        throw new Error(`Upload failed (${putRes.status}): ${t.slice(0, 200)}`);
       }
+
+      await jsonFetch(`/api/cases/${caseId}/documents`, {
+        method: "POST",
+        body: JSON.stringify({
+          filename: file.name,
+          content_type: file.type || "application/octet-stream",
+          bytes: file.size,
+          storage_bucket: up.bucket,
+          storage_path: up.path,
+          tags: [],
+          notes: null,
+        }),
+      });
+
+      await refresh();
+    } catch (e: any) {
+      setError(e?.message ?? "Upload failed");
     } finally {
-      setBusy(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
-      await load();
+      setUploading(false);
+    }
+  }
+
+  async function download(docId: string) {
+    setError(null);
+    try {
+      const j = await jsonFetch(`/api/cases/${caseId}/documents/signed-url`, {
+        method: "POST",
+        body: JSON.stringify({ doc_id: docId }),
+      });
+      window.open(j.url, "_blank", "noopener,noreferrer");
+    } catch (e: any) {
+      setError(e?.message ?? "Failed");
+    }
+  }
+
+  async function remove(docId: string) {
+    setError(null);
+    try {
+      await jsonFetch(`/api/cases/${caseId}/documents?doc_id=${encodeURIComponent(docId)}`, { method: "DELETE" });
+      setItems((p) => p.filter((x) => x.id !== docId));
+    } catch (e: any) {
+      setError(e?.message ?? "Failed");
     }
   }
 
   return (
-    <section className="rounded-xl border border-white/10 bg-white/5 p-4 backdrop-blur">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <section className="rounded-2xl border border-white/10 bg-white/5 p-4">
+      <div className="flex items-start justify-between gap-3">
         <div>
           <h3 className="text-white font-semibold">Documents</h3>
-          <p className="text-sm text-white/70">Secure storage, statuses, tags, and signed downloads.</p>
+          <p className="text-sm text-white/70">Upload evidence files and link them to exhibits, events, and drafts.</p>
         </div>
 
-        <div className="flex items-center gap-2">
-          <input
-            ref={fileInputRef}
-            type="file"
-            multiple
-            onChange={(e) => uploadSelected(e.target.files)}
-            className="hidden"
-            data-testid="file-input"
-          />
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            disabled={busy}
-            className="rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/80 hover:bg-white/10 disabled:opacity-60"
-            data-testid="upload-button"
-          >
-            Upload
-          </button>
+        <div className="flex gap-2">
+          <label className="rounded-md border border-amber-300/30 bg-amber-300/12 px-3 py-2 text-sm font-medium text-amber-100 hover:bg-amber-300/20 cursor-pointer">
+            {uploading ? "Uploading…" : "Upload"}
+            <input
+              type="file"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) uploadOne(f);
+                e.currentTarget.value = "";
+              }}
+              disabled={uploading}
+            />
+          </label>
 
-          <button
-            onClick={load}
-            className="rounded-md border border-white/10 bg-black/10 px-3 py-2 text-sm text-white/80 hover:bg-black/20"
-            data-testid="refresh-files"
-          >
+          <button onClick={refresh} className="rounded-md border border-white/10 bg-black/20 px-3 py-2 text-sm text-white/70 hover:bg-black/30">
             Refresh
           </button>
         </div>
       </div>
 
-      <div className="mt-4 space-y-2">
-        {items.length === 0 ? (
-          <div className="text-sm text-white/60">No documents yet.</div>
-        ) : (
-          items.map((f) => (
-            <div key={f.id} className="rounded-lg border border-white/10 bg-black/10 p-3" data-testid={`file-row-${f.id}`}>
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm font-medium text-white">{f.filename}</div>
+      {error ? (
+        <div className="mt-3 rounded-lg border border-red-400/30 bg-red-500/10 p-3 text-sm text-red-100">{error}</div>
+      ) : null}
+
+      {loading ? (
+        <div className="mt-3 text-sm text-white/60">Loading…</div>
+      ) : items.length === 0 ? (
+        <div className="mt-3 text-sm text-white/60">No documents yet.</div>
+      ) : (
+        <div className="mt-4 space-y-2">
+          {items.map((d) => (
+            <div key={d.id} className="rounded-xl border border-white/10 bg-black/10 p-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="text-sm font-medium text-white truncate">{d.filename}</div>
                   <div className="mt-1 text-xs text-white/60">
-                    {f.mime ?? "—"} • {fmtBytes(f.size)} • Updated {new Date(f.updated_at).toLocaleString()}
+                    {fmtBytes(d.bytes)} • {d.content_type || "unknown"} • {fmtDate(d.created_at)}
                   </div>
-
-                  <div className="mt-2 flex flex-wrap items-center gap-2">
-                    <select
-                      value={f.status}
-                      onChange={(e) => update(f.id, { status: e.target.value })}
-                      className="rounded bg-black/20 px-2 py-1 text-xs text-white"
-                      data-testid={`file-status-${f.id}`}
-                    >
-                      <option value="draft">draft</option>
-                      <option value="pending_review">pending_review</option>
-                      <option value="approved">approved</option>
-                      <option value="filed">filed</option>
-                      <option value="sent">sent</option>
-                      <option value="archived">archived</option>
-                      <option value="rejected">rejected</option>
-                    </select>
-
-                    <input
-                      value={(f.tags ?? []).join(", ")}
-                      onChange={(e) => {
-                        const tags = e.target.value
-                          .split(",")
-                          .map((s) => s.trim())
-                          .filter(Boolean);
-                        setItems((prev) => prev.map((x) => (x.id === f.id ? { ...x, tags } : x)));
-                      }}
-                      onBlur={() => update(f.id, { tags: f.tags })}
-                      placeholder="tags (comma separated)"
-                      className="min-w-[220px] flex-1 rounded bg-black/20 px-2 py-1 text-xs text-white placeholder:text-white/40"
-                      data-testid={`file-tags-${f.id}`}
-                    />
-                  </div>
-
-                  <textarea
-                    value={f.notes ?? ""}
-                    onChange={(e) =>
-                      setItems((prev) => prev.map((x) => (x.id === f.id ? { ...x, notes: e.target.value } : x)))
-                    }
-                    onBlur={() => update(f.id, { notes: f.notes })}
-                    placeholder="notes"
-                    className="mt-2 w-full rounded bg-black/20 p-2 text-xs text-white placeholder:text-white/40"
-                    data-testid={`file-notes-${f.id}`}
-                  />
+                  <div className="mt-2 text-xs text-white/50 font-mono truncate">{d.storage_path}</div>
                 </div>
 
-                <div className="flex shrink-0 flex-col gap-2">
-                  <button
-                    onClick={() => download(f.id)}
-                    className="rounded border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/80 hover:bg-white/10"
-                    data-testid={`file-download-${f.id}`}
-                  >
+                <div className="shrink-0 flex gap-2">
+                  <button onClick={() => download(d.id)} className="rounded-md border border-white/10 bg-white/5 px-2 py-1 text-xs text-white/80 hover:bg-white/10">
                     Download
                   </button>
-
-                  <button
-                    onClick={() => remove(f.id)}
-                    className="rounded border border-red-400/30 bg-red-500/10 px-3 py-2 text-sm text-red-100 hover:bg-red-500/15"
-                    data-testid={`file-delete-${f.id}`}
-                  >
+                  <button onClick={() => remove(d.id)} className="rounded-md border border-white/10 bg-black/20 px-2 py-1 text-xs text-white/70 hover:bg-black/30">
                     Delete
                   </button>
                 </div>
               </div>
             </div>
-          ))
-        )}
-      </div>
+          ))}
+        </div>
+      )}
     </section>
   );
 }

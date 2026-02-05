@@ -2,7 +2,8 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 
-export async function PATCH(req: Request, { params }: { params: { fileId: string } }) {
+export async function PATCH(req: Request, props: { params: Promise<{ fileId: string }> }) {
+  const params = await props.params;
   const supabase = await createClient();
   const { data: auth } = await supabase.auth.getUser();
   if (!auth?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -33,7 +34,8 @@ export async function PATCH(req: Request, { params }: { params: { fileId: string
   return NextResponse.json({ item: data });
 }
 
-export async function DELETE(_: Request, { params }: { params: { fileId: string } }) {
+export async function DELETE(_: Request, props: { params: Promise<{ fileId: string }> }) {
+  const params = await props.params;
   const supabase = await createClient();
   const { data: auth } = await supabase.auth.getUser();
   if (!auth?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

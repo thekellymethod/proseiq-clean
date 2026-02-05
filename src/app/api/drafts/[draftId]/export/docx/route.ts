@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 import { buildDocx } from "@/lib/docx";
 
-export async function GET(_: Request, { params }: { params: { draftId: string } }) {
+export async function GET(_: Request, props: { params: Promise<{ draftId: string }> }) {
+  const params = await props.params;
   const supabase = await createClient();
   const { data: auth } = await supabase.auth.getUser();
   if (!auth?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

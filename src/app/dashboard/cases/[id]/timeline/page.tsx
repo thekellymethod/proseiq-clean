@@ -3,7 +3,8 @@ import { getCaseById } from "@/lib/cases";
 import CaseWorkspaceShell from "@/components/case/CaseWorkspaceShell";
 import CaseTimeline from "@/components/case/CaseTimeline";
 
-export default async function CaseTimelinePage({ params }: { params: { id: string } }) {
+export default async function CaseTimelinePage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const c = await getCaseById(params.id);
 
   return (

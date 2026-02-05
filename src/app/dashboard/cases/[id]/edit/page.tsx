@@ -2,7 +2,8 @@ import { redirect } from "next/navigation";
 import Template from "@/components/layout/Template";
 import { getCaseById, updateCase } from "@/lib/cases";
 
-export default async function EditCasePage({ params }: { params: { id: string } }) {
+export default async function EditCasePage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const c = await getCaseById(params.id);
 
   async function action(formData: FormData) {

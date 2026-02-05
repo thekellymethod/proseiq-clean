@@ -153,7 +153,8 @@ function buildPdfBytes(opts: {
   return Buffer.from(pdf, "utf8");
 }
 
-export async function GET(_: Request, { params }: { params: { draftId: string } }) {
+export async function GET(_: Request, props: { params: Promise<{ draftId: string }> }) {
+  const params = await props.params;
   const supabase = await createClient();
   const { data: auth } = await supabase.auth.getUser();
   if (!auth?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

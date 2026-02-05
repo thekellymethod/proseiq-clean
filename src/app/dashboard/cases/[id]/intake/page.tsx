@@ -2,7 +2,8 @@
 import Template from "@/components/layout/Template";
 import CaseIntakeWizard from "@/components/case/CaseIntakeWizard";
 
-export default function CaseIntakePage({ params }: { params: { id: string } }) {
+export default async function CaseIntakePage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   return (
     <Template
       title="Case intake"

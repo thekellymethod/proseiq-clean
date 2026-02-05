@@ -2,7 +2,8 @@ import Template from "@/components/layout/Template";
 import { getCaseById } from "@/lib/cases";
 import CaseWorkspaceShell from "@/components/case/CaseWorkspaceShell";
 
-export default async function CasePartiesPage({ params }: { params: { id: string } }) {
+export default async function CasePartiesPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const c = await getCaseById(params.id);
   return (
     <Template title="Case" subtitle="Parties">

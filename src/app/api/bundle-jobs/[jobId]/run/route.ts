@@ -24,7 +24,8 @@ function isPdf(mime?: string | null, filename?: string | null) {
   return false;
 }
 
-export async function POST(_: Request, { params }: { params: { jobId: string } }) {
+export async function POST(_: Request, props: { params: Promise<{ jobId: string }> }) {
+  const params = await props.params;
   const supabase = await createClient();
   const { data: auth } = await supabase.auth.getUser();
   if (!auth?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

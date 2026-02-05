@@ -3,7 +3,8 @@ import Template from "@/components/layout/Template";
 import { getCaseById } from "@/lib/cases";
 import DraftsPanel from "@/components/case/DraftsPanel";
 
-export default async function CaseDraftsPage({ params }: { params: { id: string } }) {
+export default async function CaseDraftsPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const c = await getCaseById(params.id);
 
   return (
