@@ -5,7 +5,7 @@ import React from "react";
 type Exhibit = {
   id: string;
   case_id: string;
-  exhibit_no: number;
+  sequence: number;
   label: string;
   title: string;
   description: string | null;

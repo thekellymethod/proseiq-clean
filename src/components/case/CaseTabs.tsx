@@ -1,10 +1,12 @@
+// src/components/case/CaseTabs.tsx
 import Link from "next/link";
+
 
 type TabKey =
   | "overview"
   | "intake"
   | "parties"
-  | "timeline"
+  | "events"
   | "documents"
   | "exhibits"
   | "drafts"
@@ -25,7 +27,7 @@ const TABS: Tab[] = [
   { key: "overview", label: "Overview", href: (id) => `/dashboard/cases/${id}/overview` },
   { key: "intake", label: "Intake", href: (id) => `/dashboard/cases/${id}/intake` },
   { key: "parties", label: "Parties", href: (id) => `/dashboard/cases/${id}/parties` },
-  { key: "timeline", label: "Timeline", href: (id) => `/dashboard/cases/${id}/timeline` },
+  { key: "events", label: "Events", href: (id) => `/dashboard/cases/${id}/events` },
   { key: "documents", label: "Documents", href: (id) => `/dashboard/cases/${id}/documents` },
   { key: "exhibits", label: "Exhibits", href: (id) => `/dashboard/cases/${id}/exhibits` },
   { key: "drafts", label: "Drafts", href: (id) => `/dashboard/cases/${id}/drafts` },

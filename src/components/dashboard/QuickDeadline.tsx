@@ -41,7 +41,7 @@ export default function QuickDeadline({ cases }: { cases: CaseOption[] }) {
     if (!t || !d) return setError("Title and date are required.");
     setSaving(true);
     try {
-      await jsonFetch(`/api/cases/${caseId}/timeline`, {
+      await jsonFetch(`/api/cases/${caseId}/events`, {
         method: "POST",
         body: JSON.stringify({
           title: t,

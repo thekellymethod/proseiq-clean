@@ -1,4 +1,4 @@
-
+// src/app/dashboard/cases/page.tsx
 import Link from "next/link";
 import Template from "@/components/layout/Template";
 import { listCases } from "@/lib/cases";

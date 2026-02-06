@@ -1,3 +1,4 @@
+// src/components/case/CaseHeaderActions.tsx
 import Link from "next/link";
 import ArchiveCaseButton from "@/components/case/ArchiveCaseButton";
 
