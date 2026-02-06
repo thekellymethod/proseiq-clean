@@ -1,37 +1,28 @@
-import { redirect } from "next/navigation";
 import Template from "@/components/layout/Template";
-import { getCaseById, updateCase } from "@/lib/cases";
+import CaseWorkspaceShell from "@/components/case/CaseWorkspaceShell";
+import { getCaseById } from "@/lib/cases";
+import CaseTimeline from "@/components/case/CaseTimeline";
+import CaseStrategy from "@/components/case/CaseStrategy";
+import CaseMotions from "@/components/case/CaseMotions";
+import DamagesCalculator from "@/components/case/DamagesCalculator";
+import CaseDocuments from "@/components/case/CaseDocuments";
 
-export default async function CasePage(props: { params: Promise<{ id: string }> }) {
-  const params = await props.params;
+export default async function CaseWorkspaceHome({ params }: { params: { id: string } }) {
   const c = await getCaseById(params.id);
 
-  async function action(formData: FormData) {
-    "use server";
-    const title = String(formData.get("title") ?? "").trim();
-    if (!title) return;
-    await updateCase(params.id, { title });
-    redirect(`/dashboard/cases/${params.id}`);
-  }
-
   return (
-    <Template title="Edit case" subtitle="Keep titles clean and specific. This becomes your workspace label.">
-      <form action={action} className="max-w-xl space-y-3">
-        <div className="space-y-1">
-          <label className="text-xs text-white/70">Title</label>
-          <input
-            title="Title"
-            placeholder="e.g., Vehicle repossessed"
-            name="title"
-            defaultValue={c.title}
-            className="w-full rounded-md border border-white/10 bg-black/20 px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-amber-300/30"
-          />
+    <Template title={c.title} subtitle="Case workspace">
+      <CaseWorkspaceShell caseId={params.id} title={c.title} active="overview">
+        <div className="grid gap-4 lg:grid-cols-2">
+          <CaseTimeline caseId={params.id} />
+          <CaseStrategy caseId={params.id} />
+          <CaseMotions caseId={params.id} />
+          <DamagesCalculator caseId={params.id} />
+          <div className="lg:col-span-2">
+            <CaseDocuments caseId={params.id} />
+          </div>
         </div>
-
-        <button className="rounded-md border border-amber-300/30 bg-amber-300/10 px-3 py-2 text-sm font-medium text-amber-50 hover:bg-amber-300/15">
-          Save
-        </button>
-      </form>
+      </CaseWorkspaceShell>
     </Template>
   );
 }

@@ -2,76 +2,66 @@ import Link from "next/link";
 import Image from "next/image";
 import { createClient } from "@/utils/supabase/server";
 
+type NavItem = { href: string; label: string };
+
+const NAV: NavItem[] = [
+  { href: "/dashboard", label: "Dashboard" },
+  { href: "/dashboard/cases", label: "Cases" },
+  { href: "/dashboard/research", label: "Research" },
+  { href: "/dashboard/account", label: "Account" },
+];
+
 export default async function AppHeader() {
   const supabase = await createClient();
   const { data } = await supabase.auth.getUser();
-  const user = data?.user ?? null;
+  const user = data?.user;
 
   return (
-    <header className="sticky top-0 z-[200] border-b border-white/10 bg-black/40 backdrop-blur">
+    <header className="sticky top-0 z-50 border-b border-white/10 bg-black/20 backdrop-blur">
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3">
-        <Link href={user ? "/dashboard" : "/"} className="flex items-center gap-3">
-          <Image
-            src="/proseiq-logo-512-a.png"
-            alt="ProseIQ"
-            width={42}
-            height={42}
-            priority
-          />
-          <div className="leading-tight">
-            <div className="text-base font-semibold text-white tracking-tight">ProseIQ</div>
-            <div className="text-[12px] text-white/60">Pro se case workspace</div>
-          </div>
-        </Link>
+        <div className="flex items-center gap-3">
+          <Link href="/dashboard" className="flex items-center gap-3">
+            <Image
+              src="/proseiq-logo-512-a.png"
+              alt="ProseIQ"
+              width={56}
+              height={56}
+              priority
+              className="h-14 w-14 rounded-xl"
+            />
+            <div className="leading-tight">
+              <div className="text-base font-semibold text-white">ProseIQ</div>
+              <div className="text-xs text-white/60">Pro se litigation cockpit</div>
+            </div>
+          </Link>
+        </div>
 
-        <nav className="flex items-center gap-2">
-          {user ? (
-            <>
-              <Link
-                href="/dashboard"
-                className="rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/80 hover:bg-white/10"
-              >
-                Dashboard
-              </Link>
-              <Link
-                href="/dashboard/cases"
-                className="rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/80 hover:bg-white/10"
-              >
-                Cases
-              </Link>
-              <Link
-                href="/dashboard/cases/new"
-                className="rounded-md border border-amber-300/30 bg-amber-300/10 px-3 py-2 text-sm text-amber-100 hover:bg-amber-300/20"
-              >
-                New Case
-              </Link>
-
-              <form action="/auth/signout" method="post">
-                <button
-                  className="rounded-md border border-white/10 bg-black/20 px-3 py-2 text-sm text-white/70 hover:bg-black/30"
-                  type="submit"
-                >
-                  Sign out
-                </button>
-              </form>
-            </>
-          ) : (
-            <>
-              <Link
-                href="/"
-                className="rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/80 hover:bg-white/10"
-              >
-                Home
-              </Link>
-              <Link
-                href="/dashboard"
-                className="rounded-md border border-amber-300/30 bg-amber-300/10 px-3 py-2 text-sm text-amber-100 hover:bg-amber-300/20"
-              >
-                Enter app
-              </Link>
-            </>
-          )}
+        <nav className="hidden md:flex items-center gap-2">
+          {NAV.map((n) => (
+            <Link
+              key={n.href}
+              href={n.href}
+              className="rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/70 hover:bg-white/10 hover:text-white"
+            >
+              {n.label}
+            </Link>
+          ))}
         </nav>
+
+        <div className="flex items-center gap-2">
+          {user ? (
+            <div className="hidden sm:block rounded-md border border-white/10 bg-black/20 px-3 py-2 text-xs text-white/70">
+              {user.email ?? "Signed in"}
+            </div>
+          ) : (
+            <Link
+              href="/login"
+              className="rounded-md border border-amber-300/30 bg-amber-300/10 px-3 py-2 text-sm text-amber-100 hover:bg-amber-300/20"
+            >
+              Sign in
+            </Link>
+          )}
+        </div>
       </div>
     </header>
   );

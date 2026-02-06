@@ -1,25 +1,15 @@
 import Template from "@/components/layout/Template";
-import { getCaseById } from "@/lib/cases";
 import CaseWorkspaceShell from "@/components/case/CaseWorkspaceShell";
+import DraftsManager from "@/components/case/DraftsManager";
+import { getCaseById } from "@/lib/cases";
 
-export default async function CaseDraftsPage(props: { params: Promise<{ id: string }> }) {
-  const params = await props.params;
+export default async function CaseDraftsPage({ params }: { params: { id: string } }) {
   const c = await getCaseById(params.id);
+
   return (
-    <Template title="Case" subtitle="Drafts">
-      <CaseWorkspaceShell
-        caseId={params.id}
-        title={c.title}
-        subtitle={`${c.case_type ?? "general"} • ${c.status ?? "intake"} • ${c.priority ?? "normal"}`}
-        active="drafts"
-      >
-        <section className="rounded-2xl border border-white/10 bg-white/5 p-4">
-          <h3 className="text-white font-semibold">Drafts</h3>
-          <p className="mt-2 text-sm text-white/70">Add and manage drafts for the case.</p>
-          <div className="mt-4 rounded-xl border border-white/10 bg-black/10 p-4 text-sm text-white/70">
-            Placeholder: this section will become fully interactive in the next patch.
-          </div>
-        </section>
+    <Template title={c.title} subtitle="Drafts">
+      <CaseWorkspaceShell caseId={params.id} title={c.title} active="drafts">
+        <DraftsManager caseId={params.id} />
       </CaseWorkspaceShell>
     </Template>
   );
