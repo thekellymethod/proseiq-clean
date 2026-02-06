@@ -1,113 +1,138 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 
-function pad3(n: number) {
-  return String(n).padStart(3, "0");
-}
-
-export async function GET(_: Request, { params }: { params: { id: string } }) {
+async function requireUser() {
   const supabase = await createClient();
   const { data: auth } = await supabase.auth.getUser();
-  if (!auth?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!auth?.user) return { supabase, user: null, res: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
+  return { supabase, user: auth.user, res: null as any };
+}
+
+function bad(message: string, status = 400) {
+  return NextResponse.json({ error: message }, { status });
+}
+
+export async function GET(req: Request, { params }: { params: { id: string } }) {
+  const { supabase, user, res } = await requireUser();
+  if (!user) return res;
+
+  const url = new URL(req.url);
+  const includeDocs = (url.searchParams.get("includeDocs") ?? "").toLowerCase() === "true";
 
   const { data, error } = await supabase
     .from("case_exhibits")
-    .select("id,case_id,created_at,updated_at,exhibit_no,label,title,description,proof_notes,source,file_path,url,sort_order")
+    .select("id,case_id,exhibit_index,exhibit_label,title,description,kind,created_at,updated_at")
     .eq("case_id", params.id)
-    .order("sort_order", { ascending: true })
-    .order("exhibit_no", { ascending: true });
+    .order("exhibit_index", { ascending: true });
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
-  return NextResponse.json({ items: data ?? [] });
+  if (error) return bad(error.message, 400);
+  if (!includeDocs) return NextResponse.json({ items: data ?? [] });
+
+  const exhibitIds = (data ?? []).map((x) => x.id);
+  if (exhibitIds.length === 0) return NextResponse.json({ items: [] });
+
+  const { data: links } = await supabase
+    .from("case_exhibit_documents")
+    .select("exhibit_id,document_id")
+    .in("exhibit_id", exhibitIds);
+
+  const docIds = Array.from(new Set((links ?? []).map((l: any) => l.document_id).filter(Boolean)));
+  let docsById: Record<string, any> = {};
+  if (docIds.length) {
+    const { data: docs } = await supabase
+      .from("case_documents")
+      .select("id,filename,mime_type,byte_size,status,created_at,storage_bucket,storage_path")
+      .in("id", docIds);
+    docsById = Object.fromEntries((docs ?? []).map((d: any) => [d.id, d]));
+  }
+
+  const docsByExhibit: Record<string, any[]> = {};
+  for (const l of links ?? []) {
+    const d = docsById[l.document_id];
+    if (!d) continue;
+    docsByExhibit[l.exhibit_id] = docsByExhibit[l.exhibit_id] ?? [];
+    docsByExhibit[l.exhibit_id].push(d);
+  }
+
+  const enriched = (data ?? []).map((e: any) => ({ ...e, documents: docsByExhibit[e.id] ?? [] }));
+  return NextResponse.json({ items: enriched });
 }
 
 export async function POST(req: Request, { params }: { params: { id: string } }) {
-  const supabase = await createClient();
-  const { data: auth } = await supabase.auth.getUser();
-  if (!auth?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const { supabase, user, res } = await requireUser();
+  if (!user) return res;
 
-  const body = await req.json();
+  const body = await req.json().catch(() => ({}));
   const title = String(body?.title ?? "").trim();
-  if (!title) return NextResponse.json({ error: "title required" }, { status: 400 });
+  if (!title) return bad("title required", 400);
 
-  // determine next exhibit_no
-  const { data: maxRow, error: maxErr } = await supabase
-    .from("case_exhibits")
-    .select("exhibit_no")
-    .eq("case_id", params.id)
-    .order("exhibit_no", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  let exhibit_index: number | null = body?.exhibit_index ?? body?.index ?? null;
+  if (!exhibit_index) {
+    const { data: last } = await supabase
+      .from("case_exhibits")
+      .select("exhibit_index")
+      .eq("case_id", params.id)
+      .order("exhibit_index", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    exhibit_index = (Number(last?.exhibit_index ?? 0) || 0) + 1;
+  }
 
-  if (maxErr) return NextResponse.json({ error: maxErr.message }, { status: 400 });
-  const nextNo = (maxRow?.exhibit_no ?? 0) + 1;
-  const label = `C-${pad3(nextNo)}`;
+  const payload: any = {
+    case_id: params.id,
+    title,
+    description: body?.description ?? null,
+    kind: body?.kind ?? "document",
+    exhibit_index,
+    exhibit_label: body?.exhibit_label ?? `Exhibit ${exhibit_index}`,
+  };
 
   const { data, error } = await supabase
     .from("case_exhibits")
-    .insert({
-      case_id: params.id,
-      exhibit_no: nextNo,
-      label,
-      title,
-      description: body?.description ?? null,
-      proof_notes: body?.proof_notes ?? null,
-      source: body?.source ?? null,
-      url: body?.url ?? null,
-      file_path: body?.file_path ?? null,
-      sort_order: body?.sort_order ?? nextNo,
-    })
-    .select("id,case_id,created_at,updated_at,exhibit_no,label,title,description,proof_notes,source,file_path,url,sort_order")
+    .insert(payload)
+    .select("id,case_id,exhibit_index,exhibit_label,title,description,kind,created_at,updated_at")
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) return bad(error.message, 400);
   return NextResponse.json({ item: data });
 }
 
 export async function PATCH(req: Request, { params }: { params: { id: string } }) {
-  const supabase = await createClient();
-  const { data: auth } = await supabase.auth.getUser();
-  if (!auth?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const { supabase, user, res } = await requireUser();
+  if (!user) return res;
 
-  const body = await req.json();
-  const { exhibit_id, patch } = body ?? {};
-  if (!exhibit_id) return NextResponse.json({ error: "exhibit_id required" }, { status: 400 });
+  const body = await req.json().catch(() => ({}));
+  const exhibitId = String(body?.exhibit_id ?? body?.id ?? "").trim();
+  if (!exhibitId) return bad("exhibit_id required", 400);
 
-  // Do not allow changing exhibit_no or label from client
-  const safePatch = { ...(patch ?? {}) } as any;
-  delete safePatch.exhibit_no;
-  delete safePatch.label;
-  delete safePatch.case_id;
-  delete safePatch.created_by;
-  delete safePatch.created_at;
+  const patch: any = {};
+  for (const k of ["title", "description", "kind", "exhibit_index", "exhibit_label"]) if (k in body) patch[k] = body[k];
+  if ("title" in patch) patch.title = String(patch.title ?? "").trim();
 
   const { data, error } = await supabase
     .from("case_exhibits")
-    .update(safePatch)
-    .eq("id", exhibit_id)
+    .update(patch)
     .eq("case_id", params.id)
-    .select("id,case_id,created_at,updated_at,exhibit_no,label,title,description,proof_notes,source,file_path,url,sort_order")
+    .eq("id", exhibitId)
+    .select("id,case_id,exhibit_index,exhibit_label,title,description,kind,created_at,updated_at")
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) return bad(error.message, 400);
   return NextResponse.json({ item: data });
 }
 
 export async function DELETE(req: Request, { params }: { params: { id: string } }) {
-  const supabase = await createClient();
-  const { data: auth } = await supabase.auth.getUser();
-  if (!auth?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const { supabase, user, res } = await requireUser();
+  if (!user) return res;
 
   const url = new URL(req.url);
   const exhibitId = url.searchParams.get("exhibit_id");
-  if (!exhibitId) return NextResponse.json({ error: "exhibit_id required" }, { status: 400 });
+  if (!exhibitId) return bad("exhibit_id required", 400);
 
-  const { error } = await supabase
-    .from("case_exhibits")
-    .delete()
-    .eq("id", exhibitId)
-    .eq("case_id", params.id);
+  await supabase.from("case_exhibit_documents").delete().eq("exhibit_id", exhibitId);
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  const { error } = await supabase.from("case_exhibits").delete().eq("case_id", params.id).eq("id", exhibitId);
+  if (error) return bad(error.message, 400);
+
   return NextResponse.json({ ok: true });
 }

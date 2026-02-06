@@ -1,78 +1,65 @@
-
 import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 
-export async function GET(_: Request, { params }: { params: { id: string; exhibitId: string } }) {
+async function requireUser() {
   const supabase = await createClient();
   const { data: auth } = await supabase.auth.getUser();
-  if (!auth?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!auth?.user) return { supabase, user: null, res: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
+  return { supabase, user: auth.user, res: null as any };
+}
 
-  const { data: ex, error: exErr } = await supabase
-    .from("case_exhibits")
-    .select("id,case_id")
-    .eq("id", params.exhibitId)
-    .eq("case_id", params.id)
-    .maybeSingle();
-
-  if (exErr) return NextResponse.json({ error: exErr.message }, { status: 400 });
-  if (!ex) return NextResponse.json({ error: "Exhibit not found" }, { status: 404 });
-
-  const { data, error } = await supabase
-    .from("case_exhibit_documents")
-    .select("id,created_at,sort_order,note,document_id, case_documents:document_id(id,filename,content_type,bytes,storage_bucket,storage_path)")
-    .eq("exhibit_id", params.exhibitId)
-    .order("sort_order", { ascending: true })
-    .order("created_at", { ascending: true });
-
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
-  return NextResponse.json({ items: data ?? [] });
+function bad(message: string, status = 400) {
+  return NextResponse.json({ error: message }, { status });
 }
 
 export async function POST(req: Request, { params }: { params: { id: string; exhibitId: string } }) {
-  const supabase = await createClient();
-  const { data: auth } = await supabase.auth.getUser();
-  if (!auth?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const { supabase, user, res } = await requireUser();
+  if (!user) return res;
 
-  const body = await req.json();
-  const document_id = String(body?.document_id ?? "").trim();
-  const note = body?.note ?? null;
-  if (!document_id) return NextResponse.json({ error: "document_id required" }, { status: 400 });
+  const body = await req.json().catch(() => ({}));
+  const docId = String(body?.docId ?? body?.document_id ?? "").trim();
+  if (!docId) return bad("docId required", 400);
+
+  const { data: ex, error: exErr } = await supabase
+    .from("case_exhibits")
+    .select("id")
+    .eq("case_id", params.id)
+    .eq("id", params.exhibitId)
+    .maybeSingle();
+  if (exErr) return bad(exErr.message, 400);
+  if (!ex) return bad("Exhibit not found", 404);
 
   const { data: doc, error: docErr } = await supabase
     .from("case_documents")
-    .select("id,case_id")
-    .eq("id", document_id)
+    .select("id")
     .eq("case_id", params.id)
+    .eq("id", docId)
     .maybeSingle();
+  if (docErr) return bad(docErr.message, 400);
+  if (!doc) return bad("Document not found", 404);
 
-  if (docErr) return NextResponse.json({ error: docErr.message }, { status: 400 });
-  if (!doc) return NextResponse.json({ error: "Document not found" }, { status: 404 });
-
-  const { data, error } = await supabase
+  const { error } = await supabase
     .from("case_exhibit_documents")
-    .insert({ exhibit_id: params.exhibitId, document_id, note })
-    .select("id,created_at,sort_order,note,document_id")
-    .single();
+    .insert({ exhibit_id: params.exhibitId, document_id: docId });
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
-  return NextResponse.json({ item: data });
+  if (error && !/duplicate/i.test(error.message)) return bad(error.message, 400);
+  return NextResponse.json({ ok: true });
 }
 
 export async function DELETE(req: Request, { params }: { params: { id: string; exhibitId: string } }) {
-  const supabase = await createClient();
-  const { data: auth } = await supabase.auth.getUser();
-  if (!auth?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const { supabase, user, res } = await requireUser();
+  if (!user) return res;
 
   const url = new URL(req.url);
-  const linkId = url.searchParams.get("link_id");
-  if (!linkId) return NextResponse.json({ error: "link_id required" }, { status: 400 });
+  const docId = url.searchParams.get("docId") ?? url.searchParams.get("document_id");
+  if (!docId) return bad("docId required", 400);
 
   const { error } = await supabase
     .from("case_exhibit_documents")
     .delete()
-    .eq("id", linkId)
-    .eq("exhibit_id", params.exhibitId);
+    .eq("exhibit_id", params.exhibitId)
+    .eq("document_id", docId);
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) return bad(error.message, 400);
   return NextResponse.json({ ok: true });
 }

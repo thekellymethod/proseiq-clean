@@ -12,14 +12,15 @@ function bad(message: string, status = 400) {
   return NextResponse.json({ error: message }, { status });
 }
 
-export async function GET(_: Request, { params }: { params: { id: string } }) {
+export async function GET(_: Request, { params }: { params: { id: string; bundleId: string } }) {
   const { supabase, user, res } = await requireUser();
   if (!user) return res;
 
   const { data, error } = await supabase
-    .from("cases")
-    .select("id,title,status,case_type,priority,created_at,updated_at,user_id")
-    .eq("id", params.id)
+    .from("case_bundles")
+    .select("id,case_id,title,status,manifest,storage_bucket,storage_path,created_at,updated_at")
+    .eq("case_id", params.id)
+    .eq("id", params.bundleId)
     .maybeSingle();
 
   if (error) return bad(error.message, 400);
@@ -27,51 +28,46 @@ export async function GET(_: Request, { params }: { params: { id: string } }) {
   return NextResponse.json({ item: data });
 }
 
-export async function PATCH(req: Request, { params }: { params: { id: string } }) {
+export async function PATCH(req: Request, { params }: { params: { id: string; bundleId: string } }) {
   const { supabase, user, res } = await requireUser();
   if (!user) return res;
 
   const body = await req.json().catch(() => ({}));
-
   const patch: any = {};
-  for (const k of ["title", "status", "case_type", "priority", "user_id"]) {
-    if (k in body) patch[k] = body[k];
-  }
+  for (const k of ["title", "status", "manifest", "storage_bucket", "storage_path"]) if (k in body) patch[k] = body[k];
   if ("title" in patch) patch.title = String(patch.title ?? "").trim();
 
   if (Object.keys(patch).length === 0) return bad("No fields to update", 400);
 
   const { data, error } = await supabase
-    .from("cases")
+    .from("case_bundles")
     .update(patch)
-    .eq("id", params.id)
-    .select("id,title,status,case_type,priority,created_at,updated_at,user_id")
+    .eq("case_id", params.id)
+    .eq("id", params.bundleId)
+    .select("id,case_id,title,status,manifest,storage_bucket,storage_path,created_at,updated_at")
     .single();
 
   if (error) return bad(error.message, 400);
   return NextResponse.json({ item: data });
 }
 
-export async function DELETE(req: Request, { params }: { params: { id: string } }) {
+export async function DELETE(_: Request, { params }: { params: { id: string; bundleId: string } }) {
   const { supabase, user, res } = await requireUser();
   if (!user) return res;
 
-  const url = new URL(req.url);
-  const hard = (url.searchParams.get("hard") ?? "").toLowerCase() === "true";
+  const { data: bundle } = await supabase
+    .from("case_bundles")
+    .select("storage_bucket,storage_path")
+    .eq("case_id", params.id)
+    .eq("id", params.bundleId)
+    .maybeSingle();
 
-  if (hard) {
-    const { error } = await supabase.from("cases").delete().eq("id", params.id);
-    if (error) return bad(error.message, 400);
-    return NextResponse.json({ ok: true, hard: true });
+  if (bundle?.storage_bucket && bundle?.storage_path) {
+    await supabase.storage.from(bundle.storage_bucket).remove([bundle.storage_path]);
   }
 
-  const { data, error } = await supabase
-    .from("cases")
-    .update({ status: "archived" })
-    .eq("id", params.id)
-    .select("id,status,updated_at")
-    .single();
-
+  const { error } = await supabase.from("case_bundles").delete().eq("case_id", params.id).eq("id", params.bundleId);
   if (error) return bad(error.message, 400);
-  return NextResponse.json({ ok: true, item: data });
+
+  return NextResponse.json({ ok: true });
 }

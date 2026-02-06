@@ -18,16 +18,20 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
 
   const url = new URL(req.url);
   const kind = (url.searchParams.get("kind") ?? "").trim();
-  const limit = Math.min(Math.max(Number(url.searchParams.get("limit") ?? 200), 1), 2000);
+  const from = (url.searchParams.get("from") ?? "").trim();
+  const to = (url.searchParams.get("to") ?? "").trim();
+  const limit = Math.min(Math.max(Number(url.searchParams.get("limit") ?? 500), 1), 2000);
 
   let query = supabase
-    .from("case_drafts")
-    .select("id,case_id,title,kind,status,created_at,updated_at")
+    .from("case_events")
+    .select("id,case_id,event_at,kind,title,notes,created_at")
     .eq("case_id", params.id)
-    .order("updated_at", { ascending: false })
+    .order("event_at", { ascending: true })
     .limit(limit);
 
   if (kind) query = query.eq("kind", kind);
+  if (from) query = query.gte("event_at", from);
+  if (to) query = query.lte("event_at", to);
 
   const { data, error } = await query;
   if (error) return bad(error.message, 400);
@@ -40,21 +44,17 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   if (!user) return res;
 
   const body = await req.json().catch(() => ({}));
+  const event_at = String(body?.event_at ?? "").trim();
   const title = String(body?.title ?? "").trim();
-  if (!title) return bad("title required", 400);
+  const kind = String(body?.kind ?? "note").trim();
+  const notes = body?.notes ?? null;
 
-  const payload: any = {
-    case_id: params.id,
-    title,
-    kind: body?.kind ?? "draft",
-    status: body?.status ?? "draft",
-    content_md: body?.content_md ?? body?.content ?? "",
-  };
+  if (!event_at || !title) return bad("event_at and title required", 400);
 
   const { data, error } = await supabase
-    .from("case_drafts")
-    .insert(payload)
-    .select("id,case_id,title,kind,status,created_at,updated_at")
+    .from("case_events")
+    .insert({ case_id: params.id, event_at, title, kind, notes })
+    .select("id,case_id,event_at,kind,title,notes,created_at")
     .single();
 
   if (error) return bad(error.message, 400);

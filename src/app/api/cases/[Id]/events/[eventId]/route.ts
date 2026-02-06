@@ -12,59 +12,50 @@ function bad(message: string, status = 400) {
   return NextResponse.json({ error: message }, { status });
 }
 
-export async function GET(_: Request, { params }: { params: { id: string } }) {
+export async function GET(_: Request, { params }: { params: { id: string; eventId: string } }) {
   const { supabase, user, res } = await requireUser();
   if (!user) return res;
 
   const { data, error } = await supabase
-    .from("case_parties")
-    .select("id,case_id,role,name,email,phone,address,notes,created_at")
+    .from("case_events")
+    .select("id,case_id,event_at,kind,title,notes,created_at")
     .eq("case_id", params.id)
-    .order("created_at", { ascending: false });
+    .eq("id", params.eventId)
+    .maybeSingle();
 
   if (error) return bad(error.message, 400);
-  return NextResponse.json({ items: data ?? [] });
+  if (!data) return bad("Not found", 404);
+  return NextResponse.json({ item: data });
 }
 
-export async function POST(req: Request, { params }: { params: { id: string } }) {
+export async function PATCH(req: Request, { params }: { params: { id: string; eventId: string } }) {
   const { supabase, user, res } = await requireUser();
   if (!user) return res;
 
   const body = await req.json().catch(() => ({}));
-  const role = String(body?.role ?? "other");
-  const name = String(body?.name ?? "").trim();
-  if (!name) return bad("name required", 400);
+  const patch: any = {};
+  for (const k of ["event_at", "kind", "title", "notes"]) if (k in body) patch[k] = body[k];
+  if ("title" in patch) patch.title = String(patch.title ?? "").trim();
 
-  const payload: any = {
-    case_id: params.id,
-    role,
-    name,
-    email: body?.email ?? null,
-    phone: body?.phone ?? null,
-    address: body?.address ?? null,
-    notes: body?.notes ?? null,
-  };
+  if (Object.keys(patch).length === 0) return bad("No fields to update", 400);
 
   const { data, error } = await supabase
-    .from("case_parties")
-    .insert(payload)
-    .select("id,case_id,role,name,email,phone,address,notes,created_at")
+    .from("case_events")
+    .update(patch)
+    .eq("case_id", params.id)
+    .eq("id", params.eventId)
+    .select("id,case_id,event_at,kind,title,notes,created_at")
     .single();
 
   if (error) return bad(error.message, 400);
   return NextResponse.json({ item: data });
 }
 
-export async function DELETE(req: Request, { params }: { params: { id: string } }) {
+export async function DELETE(_: Request, { params }: { params: { id: string; eventId: string } }) {
   const { supabase, user, res } = await requireUser();
   if (!user) return res;
 
-  const url = new URL(req.url);
-  const partyId = url.searchParams.get("party_id");
-  if (!partyId) return bad("party_id required", 400);
-
-  const { error } = await supabase.from("case_parties").delete().eq("case_id", params.id).eq("id", partyId);
+  const { error } = await supabase.from("case_events").delete().eq("case_id", params.id).eq("id", params.eventId);
   if (error) return bad(error.message, 400);
-
   return NextResponse.json({ ok: true });
 }
