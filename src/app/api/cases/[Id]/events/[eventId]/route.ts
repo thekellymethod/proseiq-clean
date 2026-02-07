@@ -1,61 +1,52 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 
-async function requireUser() {
+export async function PATCH(req: Request, context: { params: { id: string; eventId: string } }) {
   const supabase = await createClient();
   const { data: auth } = await supabase.auth.getUser();
-  if (!auth?.user) return { supabase, user: null, res: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
-  return { supabase, user: auth.user, res: null as any };
-}
+  if (!auth?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-function bad(message: string, status = 400) {
-  return NextResponse.json({ error: message }, { status });
-}
-
-export async function GET(_: Request, { params }: { params: { id: string; eventId: string } }) {
-  const { supabase, user, res } = await requireUser();
-  if (!user) return res;
-
-  const { data, error } = await supabase
-    .from("case_events")
-    .select("id,case_id,event_at,kind,title,notes,created_at")
-    .eq("case_id", params.id)
-    .eq("id", params.eventId)
-    .maybeSingle();
-
-  if (error) return bad(error.message, 400);
-  if (!data) return bad("Not found", 404);
-  return NextResponse.json({ item: data });
-}
-
-export async function PATCH(req: Request, { params }: { params: { id: string; eventId: string } }) {
-  const { supabase, user, res } = await requireUser();
-  if (!user) return res;
+  const caseId = context.params.id;
+  const eventId = context.params.eventId;
 
   const body = await req.json().catch(() => ({}));
-  const patch: any = {};
-  for (const k of ["event_at", "kind", "title", "notes"]) if (k in body) patch[k] = body[k];
-  if ("title" in patch) patch.title = String(patch.title ?? "").trim();
+  const patch: Record<string, any> = {};
 
-  if (Object.keys(patch).length === 0) return bad("No fields to update", 400);
+  if (body?.event_at) patch.event_at = body.event_at;
+  if (body?.title) patch.title = body.title;
+  if (body?.kind) patch.kind = body.kind;
+  if (body?.notes !== undefined) patch.notes = body.notes;
+
+  if (Object.keys(patch).length === 0) {
+    return NextResponse.json({ error: "No fields to update" }, { status: 400 });
+  }
 
   const { data, error } = await supabase
     .from("case_events")
     .update(patch)
-    .eq("case_id", params.id)
-    .eq("id", params.eventId)
+    .eq("id", eventId)
+    .eq("case_id", caseId)
     .select("id,case_id,event_at,kind,title,notes,created_at")
     .single();
 
-  if (error) return bad(error.message, 400);
+  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
   return NextResponse.json({ item: data });
 }
 
-export async function DELETE(_: Request, { params }: { params: { id: string; eventId: string } }) {
-  const { supabase, user, res } = await requireUser();
-  if (!user) return res;
+export async function DELETE(_: Request, context: { params: { id: string; eventId: string } }) {
+  const supabase = await createClient();
+  const { data: auth } = await supabase.auth.getUser();
+  if (!auth?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { error } = await supabase.from("case_events").delete().eq("case_id", params.id).eq("id", params.eventId);
-  if (error) return bad(error.message, 400);
+  const caseId = context.params.id;
+  const eventId = context.params.eventId;
+
+  const { error } = await supabase
+    .from("case_events")
+    .delete()
+    .eq("id", eventId)
+    .eq("case_id", caseId);
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
   return NextResponse.json({ ok: true });
 }
