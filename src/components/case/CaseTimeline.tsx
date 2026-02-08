@@ -31,7 +31,7 @@ export default function CaseTimeline({ caseId }: { caseId: string }) {
   async function load() {
     const res = await fetch(`/api/cases/${caseId}/events`, { cache: "no-store" });
     const j = await res.json();
-    setItems(j.items ?? []);
+    setItems(j.items ?? j.events ?? []);
   }
 
   React.useEffect(() => {

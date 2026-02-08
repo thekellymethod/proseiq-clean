@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
+import { buildDocx } from "@/lib/docx";
 
 async function requireUser() {
   const supabase = await createClient();
@@ -35,33 +36,11 @@ export async function GET(_: Request, { params }: { params: { id: string; draftI
   if (error) return bad(error.message, 400);
   if (!draft) return bad("Not found", 404);
 
-  let docx: any;
-  try {
-    docx = await import("docx");
-  } catch {
-    return bad("Missing dependency: docx", 500);
-  }
-
-  const { Document, Packer, Paragraph, TextRun } = docx;
-
   const title = String(draft.title ?? "Draft");
   const text = mdToPlain(draft.content_md ?? "");
+  const bytes = buildDocx({ title, body: text });
 
-  const paragraphs = text.split(/\n{2,}/).map((block) =>
-    new Paragraph({ children: [new TextRun(block.replace(/\n/g, "\n"))] })
-  );
-
-  const doc = new Document({
-    sections: [
-      {
-        children: [new Paragraph({ children: [new TextRun({ text: title, bold: true })] }), new Paragraph(""), ...paragraphs],
-      },
-    ],
-  });
-
-  const buf = await Packer.toBuffer(doc);
-
-  return new NextResponse(buf, {
+  return new NextResponse(Buffer.from(bytes), {
     status: 200,
     headers: {
       "Content-Type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",

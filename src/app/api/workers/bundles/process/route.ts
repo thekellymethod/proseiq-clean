@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
+import { zipStore } from "@/lib/zip";
 
 async function requireUser() {
   const supabase = await createClient();
@@ -40,16 +41,9 @@ export async function POST(req: Request) {
   // Mark processing
   await supabase.from("case_bundles").update({ status: "processing" }).eq("id", bundleId);
 
-  let JSZip: any;
-  try {
-    JSZip = (await import("jszip")).default;
-  } catch {
-    await supabase.from("case_bundles").update({ status: "error" }).eq("id", bundleId);
-    return bad("Missing dependency: jszip", 500);
-  }
-
-  const zip = new JSZip();
-  zip.file("manifest.json", JSON.stringify(bundle.manifest ?? {}, null, 2));
+  const files: { name: string; data: Uint8Array }[] = [];
+  const enc = new TextEncoder();
+  files.push({ name: "manifest.json", data: enc.encode(JSON.stringify(bundle.manifest ?? {}, null, 2)) });
 
   const include: string[] = Array.isArray(bundle.manifest?.include) ? bundle.manifest.include : ["documents", "exhibits", "drafts"];
 
@@ -65,8 +59,9 @@ export async function POST(req: Request) {
       if (!d.storage_bucket || !d.storage_path) continue;
       const { data: blob } = await supabase.storage.from(d.storage_bucket).download(d.storage_path);
       if (!blob) continue;
-      const buf = Buffer.from(await blob.arrayBuffer());
-      zip.folder("documents")?.file(d.filename || `${d.id}`, buf);
+      const buf = new Uint8Array(await blob.arrayBuffer());
+      const name = `documents/${d.filename || d.id}`;
+      files.push({ name, data: buf });
     }
   }
 
@@ -78,7 +73,7 @@ export async function POST(req: Request) {
       .eq("case_id", bundle.case_id)
       .order("exhibit_index", { ascending: true });
 
-    zip.file("exhibits.json", JSON.stringify(exhibits ?? [], null, 2));
+    files.push({ name: "exhibits.json", data: enc.encode(JSON.stringify(exhibits ?? [], null, 2)) });
   }
 
   // Drafts (plain text)
@@ -89,15 +84,14 @@ export async function POST(req: Request) {
       .eq("case_id", bundle.case_id)
       .order("updated_at", { ascending: false });
 
-    const folder = zip.folder("drafts");
     for (const dr of drafts ?? []) {
       const text = mdToPlain(dr.content_md ?? "");
       const safe = String(dr.title ?? dr.id).replace(/[^a-zA-Z0-9._-]/g, "_");
-      folder?.file(`${safe}.txt`, text);
+      files.push({ name: `drafts/${safe}.txt`, data: enc.encode(text) });
     }
   }
 
-  const zipBytes = await zip.generateAsync({ type: "nodebuffer" });
+  const zipBytes = Buffer.from(zipStore(files));
 
   const bucket = "case-files";
   const storagePath = `${user.id}/${bundle.case_id}/bundles/${bundle.id}.zip`;

@@ -1,219 +1,207 @@
 "use client";
 
 import React from "react";
-import Link from "next/link";
 
 type Draft = {
   id: string;
   case_id: string;
   title: string;
-  kind: string;
-  content: string;
+  content: string | null;
+  status: string | null;
   updated_at: string;
-};
-
-type Version = {
-  id: string;
   created_at: string;
 };
 
-export default function DraftEditor({ draftId }: { draftId: string }) {
-  const [draft, setDraft] = React.useState<Draft | null>(null);
-  const [versions, setVersions] = React.useState<Version[]>([]);
-  const [saving, setSaving] = React.useState(false);
-  const [busy, setBusy] = React.useState(false);
+async function jsonFetch(url: string, init?: RequestInit) {
+  const res = await fetch(url, {
+    ...init,
+    headers: { "Content-Type": "application/json", ...(init?.headers || {}) },
+  });
+  const j = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(j?.error || `Request failed (${res.status})`);
+  return j;
+}
 
-  async function load() {
-    const res = await fetch(`/api/drafts/${draftId}`, { cache: "no-store" });
-    const j = await res.json();
-    setDraft(j.item);
+function cx(...s: Array<string | false | null | undefined>) {
+  return s.filter(Boolean).join(" ");
+}
 
-    const vr = await fetch(`/api/drafts/${draftId}/versions`, { cache: "no-store" });
-    const vj = await vr.json();
-    setVersions(vj.items ?? []);
+function fmt(iso?: string | null) {
+  if (!iso) return "—";
+  try {
+    return new Date(iso).toLocaleString();
+  } catch {
+    return iso;
   }
+}
+
+export default function DraftsEditor({
+  caseId,
+  draftId,
+}: {
+  caseId: string;
+  draftId: string;
+}) {
+  const [draft, setDraft] = React.useState<Draft | null>(null);
+  const [title, setTitle] = React.useState("");
+  const [content, setContent] = React.useState("");
+  const [status, setStatus] = React.useState("draft");
+
+  const [loading, setLoading] = React.useState(true);
+  const [saving, setSaving] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+  const [ok, setOk] = React.useState<string | null>(null);
+
+  const load = React.useCallback(async () => {
+    setError(null);
+    setOk(null);
+    setLoading(true);
+    try {
+      const j = await jsonFetch(`/api/cases/${caseId}/drafts/${draftId}`, { method: "GET" });
+      const d: Draft = j.item;
+      setDraft(d);
+      setTitle(d.title ?? "");
+      setContent(d.content ?? "");
+      setStatus((d.status ?? "draft") as any);
+    } catch (e: any) {
+      setError(e?.message ?? "Failed");
+    } finally {
+      setLoading(false);
+    }
+  }, [caseId, draftId]);
 
   React.useEffect(() => {
     load();
-  }, [draftId]);
+  }, [load]);
 
-  // autosave debounce
-  React.useEffect(() => {
-    if (!draft) return;
-    const t = setTimeout(async () => {
-      setSaving(true);
-      await fetch(`/api/drafts/${draftId}`, {
+  async function save() {
+    setError(null);
+    setOk(null);
+    setSaving(true);
+    try {
+      const j = await jsonFetch(`/api/cases/${caseId}/drafts/${draftId}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: draft.title, kind: draft.kind, content: draft.content }),
+        body: JSON.stringify({
+          patch: {
+            title: title.trim() || "Untitled draft",
+            content,
+            status,
+          },
+        }),
       });
+      setDraft(j.item ?? null);
+      setOk("Saved.");
+    } catch (e: any) {
+      setError(e?.message ?? "Failed");
+    } finally {
       setSaving(false);
-    }, 800);
-    return () => clearTimeout(t);
-  }, [draft?.title, draft?.kind, draft?.content, draftId]);
-
-  async function snapshot() {
-    setBusy(true);
-    await fetch(`/api/drafts/${draftId}`, { method: "POST" });
-    await load();
-    setBusy(false);
+      setTimeout(() => setOk(null), 1200);
+    }
   }
 
-  async function restore(versionId: string) {
-    setBusy(true);
-    const res = await fetch(`/api/drafts/${draftId}/versions`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ versionId }),
-    });
-    const j = await res.json();
-    setDraft(j.item);
-    await load();
-    setBusy(false);
-  }
-
-  async function del() {
-    if (!confirm("Delete this draft?")) return;
-    setBusy(true);
-    await fetch(`/api/drafts/${draftId}`, { method: "DELETE" });
-    setBusy(false);
-    // nothing else to do; user can navigate back manually
-  }
-
-  if (!draft) return <div className="text-white/70">Loading…</div>;
+  const pdfHref = `/api/cases/${caseId}/drafts/${draftId}/export/pdf`;
+  const docxHref = `/api/cases/${caseId}/drafts/${draftId}/export/docx`;
 
   return (
-    <div className="grid gap-4 lg:grid-cols-4">
-      <div className="lg:col-span-3 space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex gap-2">
-            <Link
-              href={`/dashboard/cases/${draft.case_id}/drafts`}
-              className="rounded border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/80 hover:bg-white/10"
-            >
-              <div className="flex gap-2">
-  <Link
-    href={`/dashboard/cases/${draft.case_id}/drafts`}
-    className="rounded border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/80 hover:bg-white/10"
-  >
-    Back
-  </Link>
-
-  <button
-    disabled={busy}
-    onClick={snapshot}
-    className="rounded border border-amber-300/30 bg-amber-300/10 px-3 py-2 text-sm text-amber-100 hover:bg-amber-300/20 disabled:opacity-60"
-  >
-    Snapshot
-  </button>
-
-  <a
-    href={`/api/drafts/${draftId}/export/pdf`}
-    className="rounded border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/80 hover:bg-white/10"
-  >
-    Export PDF
-  </a>
-
-  <a
-    href={`/api/drafts/${draftId}/export/html`}
-    className="rounded border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/80 hover:bg-white/10"
-  >
-    Export HTML
-  </a>
-
-  <button
-    disabled={busy}
-    onClick={del}
-    className="rounded border border-red-400/30 bg-red-500/10 px-3 py-2 text-sm text-red-100 hover:bg-red-500/15 disabled:opacity-60"
-  >
-    <a
-  href={`/api/drafts/${draftId}/export/docx`}
-  className="rounded border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/80 hover:bg-white/10"
->
-  Export DOCX
-</a>
-
-    Delete
-  </button>
-</div>
-<a
-  href={`/api/cases/${draft.case_id}/bundle?draftId=${draftId}`}
-  className="rounded border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/80 hover:bg-white/10"
->
-  Bundle ZIP (Draft + Exhibits)
-</a>
-<a
-  href={`/api/drafts/${draftId}/export/html`}
-  target="_blank"
-  rel="noopener noreferrer"
-  className="rounded border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/80 hover:bg-white/10"
->
-<a
-  href={`/api/cases/${draft.case_id}/bundle?draftId=${draftId}&prefix=PROSEIQ&batesStart=1&batesWidth=6`}
-  className="rounded border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/80 hover:bg-white/10"
->
-  Bundle ZIP (Draft + Exhibits)
-</a>
-
-  Print View
-</a>
-
-          <div className="text-xs text-white/60">
-            {saving ? "Saving…" : `Updated: ${new Date(draft.updated_at).toLocaleString()}`}
-          </div>
+    <section className="rounded-2xl border border-white/10 bg-white/5 p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h3 className="text-white font-semibold">Draft editor</h3>
+          <p className="text-sm text-white/70">
+            Keep it simple for MVP: edit, save, export.
+          </p>
         </div>
 
-        <div className="grid gap-2 md:grid-cols-3">
-          <input
-            value={draft.title}
-            onChange={(e) => setDraft({ ...draft, title: e.target.value })}
-            className="rounded bg-black/20 p-2 text-white placeholder:text-white/40"
-            placeholder="Title"
-          />
-          <select
-            value={draft.kind}
-            onChange={(e) => setDraft({ ...draft, kind: e.target.value })}
-            className="rounded bg-black/20 p-2 text-white"
+        <div className="flex flex-wrap items-center gap-2">
+          <a
+            href={pdfHref}
+            className="rounded-md border border-white/10 bg-black/20 px-3 py-2 text-sm text-white/80 hover:bg-black/30"
           >
-            <option value="narrative">narrative</option>
-            <option value="demand_letter">demand_letter</option>
-            <option value="petition">petition</option>
-            <option value="motion">motion</option>
-            <option value="memo">memo</option>
-            <option value="notes">notes</option>
-          </select>
-          <div className="rounded bg-black/10 p-2 text-xs text-white/60">
-            Draft ID: {draft.id.slice(0, 8)}
+            Export PDF
+          </a>
+          <a
+            href={docxHref}
+            className="rounded-md border border-white/10 bg-black/20 px-3 py-2 text-sm text-white/80 hover:bg-black/30"
+          >
+            Export DOCX
+          </a>
+          <button
+            onClick={save}
+            disabled={saving || loading}
+            className={cx(
+              "rounded-md border px-3 py-2 text-sm font-medium",
+              "border-amber-300/30 bg-amber-300/12 text-amber-100 hover:bg-amber-300/20",
+              (saving || loading) && "opacity-60"
+            )}
+          >
+            {saving ? "Saving…" : "Save"}
+          </button>
+        </div>
+      </div>
+
+      {error ? (
+        <div className="mt-3 rounded-lg border border-red-400/30 bg-red-500/10 p-3 text-sm text-red-100">
+          {error}
+        </div>
+      ) : null}
+      {ok ? (
+        <div className="mt-3 rounded-lg border border-emerald-400/30 bg-emerald-500/10 p-3 text-sm text-emerald-100">
+          {ok}
+        </div>
+      ) : null}
+
+      {loading ? (
+        <div className="mt-4 text-sm text-white/60">Loading…</div>
+      ) : (
+        <div className="mt-4 space-y-3">
+          <div className="grid gap-3 lg:grid-cols-3">
+            <div className="lg:col-span-2 space-y-1">
+              <label className="text-xs text-white/70">Title</label>
+              <input
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                className="w-full rounded-md border border-white/10 bg-black/20 px-3 py-2 text-sm text-white placeholder:text-white/40"
+                placeholder="Untitled draft"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs text-white/70">Status</label>
+              <select
+                value={status}
+                onChange={(e) => setStatus(e.target.value)}
+                className="w-full rounded-md border border-white/10 bg-black/20 px-3 py-2 text-sm text-white"
+              >
+                <option value="draft">draft</option>
+                <option value="final">final</option>
+                <option value="archived">archived</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-xs text-white/70">Body</label>
+            <textarea
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              className="w-full min-h-[420px] rounded-md border border-white/10 bg-black/20 px-3 py-2 text-sm text-white"
+              placeholder="Write here…"
+            />
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-white/55">
+            <div>
+              Updated: {fmt(draft?.updated_at)} • Created: {fmt(draft?.created_at)}
+            </div>
+            <button
+              onClick={load}
+              className="rounded-md border border-white/10 bg-black/20 px-2 py-1 text-xs text-white/70 hover:bg-black/30"
+            >
+              Refresh
+            </button>
           </div>
         </div>
-
-        <textarea
-          value={draft.content}
-          onChange={(e) => setDraft({ ...draft, content: e.target.value })}
-          className="min-h-[520px] w-full rounded-xl border border-white/10 bg-black/20 p-4 text-white"
-          placeholder="Write here…"
-        />
-      </div>
-
-      <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-        <div className="text-white font-medium">Versions</div>
-        <div className="mt-3 space-y-2">
-          {versions.length === 0 ? (
-            <div className="text-sm text-white/60">No snapshots yet.</div>
-          ) : (
-            versions.map((v) => (
-              <button
-                key={v.id}
-                disabled={busy}
-                onClick={() => restore(v.id)}
-                className="w-full rounded border border-white/10 bg-black/20 px-3 py-2 text-left text-sm text-white/80 hover:bg-black/30 disabled:opacity-60"
-              >
-                {new Date(v.created_at).toLocaleString()}
-              </button>
-            ))
-          )}
-        </div>
-      </div>
-    </div>
+      )}
+    </section>
   );
 }

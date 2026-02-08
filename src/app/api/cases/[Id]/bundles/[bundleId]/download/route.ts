@@ -16,9 +16,6 @@ export async function GET(req: Request, { params }: { params: { id: string; bund
   const { supabase, user, res } = await requireUser();
   if (!user) return res;
 
-  const url = new URL(req.url);
-  const expiresIn = Math.min(Math.max(Number(url.searchParams.get("expiresIn") ?? 900), 60), 7 * 24 * 3600);
-
   const { data: bundle, error } = await supabase
     .from("case_bundles")
     .select("id,status,storage_bucket,storage_path,title")
@@ -33,8 +30,19 @@ export async function GET(req: Request, { params }: { params: { id: string; bund
     return bad("Bundle not ready. Process it first.", 409);
   }
 
-  const { data, error: signErr } = await supabase.storage.from(bundle.storage_bucket).createSignedUrl(bundle.storage_path, expiresIn);
-  if (signErr) return bad(signErr.message, 400);
+  const { data: blob, error: dlErr } = await supabase.storage.from(bundle.storage_bucket).download(bundle.storage_path);
+  if (dlErr) return bad(dlErr.message, 400);
+  if (!blob) return bad("Bundle not found", 404);
 
-  return NextResponse.json({ signedUrl: data?.signedUrl, expiresIn, item: bundle });
+  const bytes = Buffer.from(await blob.arrayBuffer());
+  const filename = `${bundle.title || bundle.id}.zip`.replace(/[^a-zA-Z0-9._-]+/g, "_");
+
+  return new NextResponse(bytes, {
+    status: 200,
+    headers: {
+      "Content-Type": "application/zip",
+      "Content-Disposition": `attachment; filename=\"${filename}\"`,
+      "Content-Length": String(bytes.length),
+    },
+  });
 }

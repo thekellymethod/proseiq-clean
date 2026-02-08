@@ -1,4 +1,4 @@
-// src/components/case/CaseWorkspaceShell.tsx
+import type { ReactNode } from "react";
 import Template from "@/components/layout/Template";
 import CaseTabs from "@/components/case/CaseTabs";
 import CaseHeaderActions from "@/components/case/CaseHeaderActions";
@@ -11,7 +11,7 @@ export default async function CaseWorkspaceShell({
 }: {
   caseId: string;
   active?: any;
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
   const c = await getCaseById(caseId);
 

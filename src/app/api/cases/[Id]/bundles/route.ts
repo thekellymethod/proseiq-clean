@@ -42,5 +42,20 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     .single();
 
   if (error) return bad(error.message, 400);
+  if (bundle?.id) {
+    const origin = new URL(req.url).origin;
+    try {
+      await fetch(`${origin}/api/workers/bundles/process`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          cookie: req.headers.get("cookie") ?? "",
+        },
+        body: JSON.stringify({ bundleId: bundle.id }),
+      });
+    } catch {
+      // Best-effort enqueue; worker will be retried by user if needed.
+    }
+  }
   return NextResponse.json({ item: bundle });
 }

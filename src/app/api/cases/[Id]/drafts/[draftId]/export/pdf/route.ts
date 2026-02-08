@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
+import { stampPdfBates } from "@/lib/pdf-stamp";
 
 async function requireUser() {
   const supabase = await createClient();
@@ -21,7 +22,7 @@ function mdToPlain(md: string) {
     .replace(/`([^`]+)`/g, "$1");
 }
 
-export async function GET(_: Request, { params }: { params: { id: string; draftId: string } }) {
+export async function GET(req: Request, { params }: { params: { id: string; draftId: string } }) {
   const { supabase, user, res } = await requireUser();
   if (!user) return res;
 
@@ -83,7 +84,21 @@ export async function GET(_: Request, { params }: { params: { id: string; draftI
     y -= lineHeight;
   }
 
-  const bytes = await pdf.save();
+  let bytes = await pdf.save();
+
+  const url = new URL(req.url);
+  const prefix = (url.searchParams.get("prefix") ?? "").trim();
+  const start = Number(url.searchParams.get("batesStart") ?? "");
+  const batesWidth = Number(url.searchParams.get("batesWidth") ?? "");
+  if (prefix && Number.isFinite(start) && Number.isFinite(batesWidth) && start > 0 && batesWidth > 0) {
+    const stamped = await stampPdfBates(new Uint8Array(bytes), {
+      prefix,
+      start,
+      width: batesWidth,
+    });
+    bytes = stamped.pdf;
+  }
+  
   return new NextResponse(Buffer.from(bytes), {
     status: 200,
     headers: {

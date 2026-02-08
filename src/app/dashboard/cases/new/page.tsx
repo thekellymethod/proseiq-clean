@@ -1,4 +1,4 @@
-
+// src/app/dashboard/cases/new/page.tsx
 import Template from "@/components/layout/Template";
 import NewCaseWizard from "@/components/case/NewCaseWizard";
 

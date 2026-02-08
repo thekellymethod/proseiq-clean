@@ -1,6 +1,6 @@
 // src/lib/cases.ts
 import { createClient } from "@/utils/supabase/server";
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 export type CaseRow = {
   id: string;
@@ -13,6 +13,7 @@ export type CaseRow = {
 };
 
 const CASE_SELECT = "id,title,status,created_by,created_at,updated_at,user_id";
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export async function requireUser() {
   const supabase = await createClient();
@@ -34,6 +35,8 @@ export async function listCases() {
 }
 
 export async function getCaseById(id: string) {
+  if (!id || id === "undefined" || !UUID_RE.test(id)) notFound();
+
   const { supabase, user } = await requireUser();
   const { data, error } = await supabase
     .from("cases")
