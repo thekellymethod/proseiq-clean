@@ -1,13 +1,14 @@
 
 import CaseWorkspaceShell from "@/components/case/CaseWorkspaceShell";
-import ExportPanel from "@/components/case/ExportPanel";
-import { getCaseById } from "@/lib/cases";
 
 
-export default async function ExportPanel({ params }: { params: { id: string } }) {
+export default async function CaseExportPage({ params }: { params: { id: string } }) {
   return (
-    <CaseWorkspaceShell caseId={params.id} active="analysis">
-      <ExportPanel caseId={params.id} />
+    <CaseWorkspaceShell caseId={params.id} active="export">
+      <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+        <h2 className="text-white font-semibold">Export</h2>
+        <p className="text-sm text-white/70">Coming soon:Export your case to a PDF or DOCX file.</p>
+      </div>
     </CaseWorkspaceShell>
   );
 }
