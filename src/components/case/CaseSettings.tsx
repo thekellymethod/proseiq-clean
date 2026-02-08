@@ -34,7 +34,7 @@ export default function CaseSettings({ caseId }: { caseId: string }) {
     } finally {
       setLoading(false);
     }
-  }, [caseId]);
+  }, [caseId]); 
 
   React.useEffect(() => {
     load();

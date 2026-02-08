@@ -27,7 +27,7 @@ export default function BundleJobsPanel({ caseId }: { caseId: string }) {
 
   React.useEffect(() => {
     load();
-  }, [caseId]);
+  }, [caseId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function createJob() {
     setBusy(true);

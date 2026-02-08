@@ -70,7 +70,7 @@ export default function CaseIntakeWizard({ caseId }: { caseId: string }) {
 
   React.useEffect(() => {
     load();
-  }, [caseId]);
+  }, [caseId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function setField<K extends keyof Intake>(k: K, v: Intake[K]) {
     setIntake((prev) => ({ ...prev, [k]: v }));

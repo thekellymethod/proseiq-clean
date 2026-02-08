@@ -25,7 +25,7 @@ export default function DraftsPanel({ caseId }: { caseId: string }) {
 
   React.useEffect(() => {
     load();
-  }, [caseId]);
+  }, [caseId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function create() {
     if (!title.trim()) return;
