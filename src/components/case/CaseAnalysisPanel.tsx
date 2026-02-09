@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/cases";
+import CaseFocusPanel from "@/components/case/CaseFocusPanel";
 
 function fmt(iso: string) {
   try {
@@ -14,10 +15,10 @@ function isOverdue(iso: string) {
 }
 
 export default async function CaseAnalysisPanel({ caseId }: { caseId: string }) {
-  const { supabase } = await requireUser();
+  const { supabase, user } = await requireUser();
   const nowIso = new Date().toISOString();
 
-  const [intakeRow, overdueDeadlines, upcomingDeadlines, openTasks, drafts, bundles] = await Promise.all([
+  const [intakeRow, overdueDeadlines, upcomingDeadlines, openTasks, drafts, bundles, focusOutputs, queuedJobs] = await Promise.all([
     supabase.from("case_intakes").select("case_id,intake,updated_at,created_at").eq("case_id", caseId).maybeSingle(),
     supabase
       .from("case_events")
@@ -55,6 +56,21 @@ export default async function CaseAnalysisPanel({ caseId }: { caseId: string }) 
       .eq("case_id", caseId)
       .order("created_at", { ascending: false })
       .limit(6),
+    supabase
+      .from("case_ai_outputs")
+      .select("id,output_type,title,content,updated_at")
+      .eq("case_id", caseId)
+      .eq("created_by", user.id)
+      .in("output_type", ["case_analysis", "relevance_flag", "motion_recommendation", "deadline_plan"])
+      .order("updated_at", { ascending: false })
+      .limit(10),
+    supabase
+      .from("case_ai_jobs")
+      .select("id")
+      .eq("case_id", caseId)
+      .eq("created_by", user.id)
+      .eq("status", "queued")
+      .limit(50),
   ]);
 
   const intake = (intakeRow.data as any)?.intake ?? {};
@@ -75,6 +91,13 @@ export default async function CaseAnalysisPanel({ caseId }: { caseId: string }) 
   return (
     <div className="grid gap-4 lg:grid-cols-2">
       <section className="space-y-4">
+        <CaseFocusPanel
+          caseId={caseId}
+          openaiConfigured={Boolean(process.env.OPENAI_API_KEY)}
+          queuedJobs={(queuedJobs.data ?? []).length}
+          outputs={(focusOutputs.data ?? []) as any}
+        />
+
         <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
           <h3 className="text-white font-semibold">Case health</h3>
           <p className="mt-1 text-sm text-white/70">A quick diagnostic view of what’s missing and what’s urgent.</p>

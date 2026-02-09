@@ -2,6 +2,8 @@
 "use client";
 
 import React from "react";
+import Link from "next/link";
+import { createClient as createSupabaseClient } from "@/utils/supabase/client";
 
 type DocRow = {
   id: string;
@@ -70,40 +72,54 @@ export default function CaseDocuments({ params }: { params: { caseId: string } }
   async function uploadOne(file: File) {
     setError(null);
     setUploading(true);
+    let up: any = null;
     try {
-      const up = await jsonFetch(`/api/cases/${caseId}/documents/upload`, {
+      up = await jsonFetch(`/api/cases/${caseId}/documents/upload`, {
         method: "POST",
         body: JSON.stringify({ filename: file.name, mime_type: file.type || "application/octet-stream", byte_size: file.size }),
       });
 
-      const putRes = await fetch(up.upload?.signedUrl, {
-        method: "PUT",
-        headers: { "Content-Type": file.type || "application/octet-stream" },
-        body: file,
-      });
+      const bucket = String(up?.upload?.bucket ?? "case-documents");
+      const path = String(up?.upload?.path ?? "");
+      const token = String(up?.upload?.token ?? "");
+      const signedUrl = String(up?.upload?.signedUrl ?? "");
 
-      if (!putRes.ok) {
-        const t = await putRes.text().catch(() => "");
-        throw new Error(`Upload failed (${putRes.status}): ${t.slice(0, 200)}`);
+      // Prefer Supabase's `uploadToSignedUrl()` flow (more reliable than raw fetch).
+      if (path && token) {
+        const supabase = createSupabaseClient();
+        const { error } = await supabase.storage.from(bucket).uploadToSignedUrl(path, token, file, {
+          contentType: file.type || "application/octet-stream",
+        });
+        if (error) throw new Error(error.message);
+      } else if (signedUrl) {
+        const putRes = await fetch(signedUrl, {
+          method: "PUT",
+          headers: { "Content-Type": file.type || "application/octet-stream" },
+          body: file,
+        });
+
+        if (!putRes.ok) {
+          const t = await putRes.text().catch(() => "");
+          throw new Error(`Upload failed (${putRes.status}): ${t.slice(0, 200)}`);
+        }
+      } else {
+        throw new Error("Upload failed: missing signed upload details");
       }
 
       await refresh();
     } catch (e: any) {
+      // Best-effort cleanup: remove the DB record if we created one but failed uploading.
+      const createdId = up?.item?.id;
+      if (createdId) {
+        try {
+          await jsonFetch(`/api/cases/${caseId}/documents/${createdId}`, { method: "DELETE" });
+        } catch {
+          // ignore
+        }
+      }
       setError(e?.message ?? "Upload failed");
     } finally {
       setUploading(false);
-    }
-  }
-
-  async function download(docId: string) {
-    setError(null);
-    try {
-      const j = await jsonFetch(`/api/cases/${caseId}/documents/${docId}/signed-url`, { method: "GET" });
-      const url = String(j.signedUrl ?? "");
-      if (!url) throw new Error("Missing signedUrl");
-      window.open(url, "_blank", "noopener,noreferrer");
-    } catch (e: any) {
-      setError(e?.message ?? "Failed");
     }
   }
 
@@ -168,9 +184,18 @@ export default function CaseDocuments({ params }: { params: { caseId: string } }
                 </div>
 
                 <div className="shrink-0 flex gap-2">
-                  <button onClick={() => download(d.id)} className="rounded-md border border-white/10 bg-white/5 px-2 py-1 text-xs text-white/80 hover:bg-white/10">
+                  <Link
+                    href={`/dashboard/cases/${caseId}/documents/${d.id}`}
+                    className="rounded-md border border-white/10 bg-black/20 px-2 py-1 text-xs text-white/70 hover:bg-black/30"
+                  >
+                    View
+                  </Link>
+                  <a
+                    href={`/api/cases/${caseId}/documents/${d.id}/download`}
+                    className="rounded-md border border-white/10 bg-white/5 px-2 py-1 text-xs text-white/80 hover:bg-white/10"
+                  >
                     Download
-                  </button>
+                  </a>
                   <button onClick={() => remove(d.id)} className="rounded-md border border-white/10 bg-black/20 px-2 py-1 text-xs text-white/70 hover:bg-black/30">
                     Delete
                   </button>

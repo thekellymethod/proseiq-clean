@@ -22,7 +22,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
 
   const { data: doc, error } = await supabase
     .from("documents")
-    .select("id,storage_bucket,storage_path,filename,mime_type")
+    .select("id,storage_bucket,storage_path,filename")
     .eq("case_id", id)
     .eq("id", docId)
     .maybeSingle();
@@ -33,19 +33,12 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
 
   const { data, error: signErr } = await supabase.storage.from(doc.storage_bucket).createSignedUrl(doc.storage_path, expiresIn);
   if (signErr) return bad(signErr.message, 400);
+  if (!data?.signedUrl) return bad("Failed to create signed URL", 400);
 
-  let downloadUrl: string | null = null;
-  if (data?.signedUrl) {
-    try {
-      const u = new URL(data.signedUrl);
-      // Supabase Storage supports `download` query param to force attachment.
-      // If unsupported, this is still a harmless hint.
-      u.searchParams.set("download", doc.filename || "document");
-      downloadUrl = u.toString();
-    } catch {
-      downloadUrl = null;
-    }
-  }
+  // Hint to Storage to return as attachment (download)
+  const signed = new URL(data.signedUrl);
+  signed.searchParams.set("download", doc.filename || "document");
 
-  return NextResponse.json({ item: doc, signedUrl: data?.signedUrl, downloadUrl, expiresIn });
+  return NextResponse.redirect(signed.toString());
 }
+

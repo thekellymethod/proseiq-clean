@@ -1,6 +1,18 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 
+async function enqueueJob(supabase: any, userId: string, opts: { caseId: string; jobType: string; sourceType?: string; sourceId?: string; payload?: any }) {
+  await supabase.from("case_ai_jobs").insert({
+    case_id: opts.caseId,
+    created_by: userId,
+    job_type: opts.jobType,
+    source_type: opts.sourceType ?? null,
+    source_id: opts.sourceId ?? null,
+    payload: opts.payload ?? {},
+    status: "queued",
+  });
+}
+
 export async function GET(req: Request, context: { params: Promise<{ id: string }> }) {
   const supabase = await createClient();
   const { data: auth } = await supabase.auth.getUser();
@@ -49,5 +61,19 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+
+  // Best-effort enqueue for proactive analysis.
+  try {
+    await enqueueJob(supabase, auth.user.id, {
+      caseId,
+      jobType: "event_created",
+      sourceType: "case_events",
+      sourceId: data.id,
+      payload: { event: data },
+    });
+  } catch {
+    // ignore enqueue failures; core CRUD must succeed
+  }
+
   return NextResponse.json({ item: data });
 }

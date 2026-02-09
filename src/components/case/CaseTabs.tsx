@@ -13,6 +13,7 @@ type TabKey =
   | "discovery"
   | "motions"
   | "research"
+  | "assistant"
   | "export"
   | "analysis"
   | "edit";
@@ -34,6 +35,7 @@ const TABS: Tab[] = [
   { key: "discovery", label: "Discovery", href: (id) => `/dashboard/cases/${id}/discovery` },
   { key: "motions", label: "Motions", href: (id) => `/dashboard/cases/${id}/motions` },
   { key: "research", label: "Research", href: (id) => `/dashboard/cases/${id}/research` },
+  { key: "assistant", label: "Assistant", href: (id) => `/dashboard/cases/${id}/assistant` },
   { key: "export", label: "Export", href: (id) => `/dashboard/cases/${id}/export` },
   { key: "analysis", label: "Analysis", href: (id) => `/dashboard/cases/${id}/analysis` },
   { key: "edit", label: "Settings", href: (id) => `/dashboard/cases/${id}/edit` },

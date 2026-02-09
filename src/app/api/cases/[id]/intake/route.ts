@@ -1,6 +1,22 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 
+async function enqueueJob(
+  supabase: any,
+  userId: string,
+  opts: { caseId: string; jobType: string; sourceType?: string; sourceId?: string | null; payload?: any }
+) {
+  await supabase.from("case_ai_jobs").insert({
+    case_id: opts.caseId,
+    created_by: userId,
+    job_type: opts.jobType,
+    source_type: opts.sourceType ?? null,
+    source_id: opts.sourceId ?? null,
+    payload: opts.payload ?? {},
+    status: "queued",
+  });
+}
+
 async function requireUser() {
   const supabase = await createClient();
   const { data: auth } = await supabase.auth.getUser();
@@ -58,6 +74,20 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       console.error("PATCH /api/cases/[id]/intake failed", { message: error.message, code: (error as any).code, details: (error as any).details });
       return bad(error.message, 400);
     }
+
+    // Best-effort enqueue for proactive analysis.
+    try {
+      await enqueueJob(supabase, user.id, {
+        caseId: id,
+        jobType: "intake_updated",
+        sourceType: "case_intakes",
+        sourceId: null,
+        payload: { patchKeys: Object.keys(patch ?? {}) },
+      });
+    } catch {
+      // ignore
+    }
+
     return NextResponse.json({ item: data?.intake ?? nextIntake });
   } catch (e: any) {
     return bad(e?.message ?? "Failed to update intake", 400);

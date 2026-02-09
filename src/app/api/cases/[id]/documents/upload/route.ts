@@ -1,6 +1,18 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 
+async function enqueueJob(supabase: any, userId: string, opts: { caseId: string; jobType: string; sourceType?: string; sourceId?: string; payload?: any }) {
+  await supabase.from("case_ai_jobs").insert({
+    case_id: opts.caseId,
+    created_by: userId,
+    job_type: opts.jobType,
+    source_type: opts.sourceType ?? null,
+    source_id: opts.sourceId ?? null,
+    payload: opts.payload ?? {},
+    status: "queued",
+  });
+}
+
 async function requireUser() {
   const supabase = await createClient();
   const { data: auth } = await supabase.auth.getUser();
@@ -50,8 +62,29 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   if (rowErr) return bad(rowErr.message, 400);
 
+  // Best-effort enqueue for proactive analysis (document added).
+  try {
+    await enqueueJob(supabase, user.id, {
+      caseId: id,
+      jobType: "document_added",
+      sourceType: "documents",
+      sourceId: row.id,
+      payload: { filename: row.filename, mime_type: row.mime_type, kind: row.kind },
+    });
+  } catch {
+    // ignore
+  }
+
   const { data, error } = await supabase.storage.from(bucket).createSignedUploadUrl(objectPath);
-  if (error) return bad(error.message, 400);
+  if (error) {
+    // Roll back the DB row if we couldn't create an upload URL.
+    try {
+      await supabase.from("documents").delete().eq("id", row.id).eq("case_id", id);
+    } catch {
+      // ignore
+    }
+    return bad(error.message, 400);
+  }
 
   return NextResponse.json({
     item: {
