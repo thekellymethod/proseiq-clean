@@ -1,3 +1,4 @@
+//src/components/case/DiscoveryManager.tsx
 import CaseTasks from "@/components/case/CaseTasks";
 
 export default function DiscoveryManager({ caseId }: { caseId: string }) {

@@ -1,3 +1,4 @@
+//src/components/case/DraftEditor.tsx
 import DraftsEditor from "@/components/drafts/DraftsEditor";
 
 export default function DraftEditor({ caseId, draftId }: { caseId: string; draftId: string }) {

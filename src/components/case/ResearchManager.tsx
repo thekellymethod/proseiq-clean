@@ -1,3 +1,4 @@
+//src/components/case/ResearchManager.tsx
 import CaseLawSection from "@/components/case/CaseLawSection";
 
 export default function ResearchManager({ caseId }: { caseId: string }) {
