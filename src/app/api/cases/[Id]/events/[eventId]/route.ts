@@ -1,13 +1,12 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 
-export async function PATCH(req: Request, context: { params: { id: string; eventId: string } }) {
+export async function PATCH(req: Request, context: { params: Promise<{ id: string; eventId: string }> }) {
   const supabase = await createClient();
   const { data: auth } = await supabase.auth.getUser();
   if (!auth?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const caseId = context.params.id;
-  const eventId = context.params.eventId;
+  const { id: caseId, eventId } = await context.params;
 
   const body = await req.json().catch(() => ({}));
   const patch: Record<string, any> = {};
@@ -33,13 +32,12 @@ export async function PATCH(req: Request, context: { params: { id: string; event
   return NextResponse.json({ item: data });
 }
 
-export async function DELETE(_: Request, context: { params: { id: string; eventId: string } }) {
+export async function DELETE(_: Request, context: { params: Promise<{ id: string; eventId: string }> }) {
   const supabase = await createClient();
   const { data: auth } = await supabase.auth.getUser();
   if (!auth?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const caseId = context.params.id;
-  const eventId = context.params.eventId;
+  const { id: caseId, eventId } = await context.params;
 
   const { error } = await supabase
     .from("case_events")

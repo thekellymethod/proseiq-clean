@@ -36,19 +36,20 @@ function toIcsDate(dtIso: string) {
   );
 }
 
-export async function GET(req: Request, { params }: { params: { id: string } }) {
+export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { supabase, user, res } = await requireUser();
   if (!user) return res;
 
+  const { id } = await params;
   const url = new URL(req.url);
   const limit = Math.min(Math.max(Number(url.searchParams.get("limit") ?? 500), 1), 2000);
 
   const [{ data: c }, { data: events, error }] = await Promise.all([
-    supabase.from("cases").select("id,title").eq("id", params.id).maybeSingle(),
+    supabase.from("cases").select("id,title").eq("id", id).maybeSingle(),
     supabase
       .from("case_events")
       .select("id,event_at,kind,title,notes,created_at")
-      .eq("case_id", params.id)
+      .eq("case_id", id)
       .order("event_at", { ascending: true })
       .limit(limit),
   ]);
@@ -67,7 +68,7 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
   ];
 
   const body = (events ?? []).map((e) => {
-    const uid = `proseiq-${params.id}-${e.id}@proseiq.local`;
+    const uid = `proseiq-${id}-${e.id}@proseiq.local`;
     const dtStart = toIcsDate(e.event_at);
     const dtEnd = toIcsDate(new Date(new Date(e.event_at).getTime() + 30 * 60000).toISOString());
     const summary = `${e.kind?.toUpperCase?.() ?? "EVENT"}: ${e.title}`;
@@ -91,7 +92,7 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
     status: 200,
     headers: {
       "Content-Type": "text/calendar; charset=utf-8",
-      "Content-Disposition": `attachment; filename="case-${params.id}.ics"`,
+      "Content-Disposition": `attachment; filename="case-${id}.ics"`,
     },
   });
 }

@@ -12,10 +12,11 @@ function bad(message: string, status = 400) {
   return NextResponse.json({ error: message }, { status });
 }
 
-export async function GET(req: Request, { params }: { params: { id: string } }) {
+export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { supabase, user, res } = await requireUser();
   if (!user) return res;
 
+  const { id } = await params;
   const url = new URL(req.url);
   const kind = (url.searchParams.get("kind") ?? "").trim();
   const limit = Math.min(Math.max(Number(url.searchParams.get("limit") ?? 200), 1), 2000);
@@ -23,7 +24,7 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
   let query = supabase
     .from("case_drafts")
     .select("id,case_id,title,kind,status,created_at,updated_at")
-    .eq("case_id", params.id)
+    .eq("case_id", id)
     .order("updated_at", { ascending: false })
     .limit(limit);
 
@@ -35,16 +36,17 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
   return NextResponse.json({ items: data ?? [] });
 }
 
-export async function POST(req: Request, { params }: { params: { id: string } }) {
+export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { supabase, user, res } = await requireUser();
   if (!user) return res;
 
+  const { id } = await params;
   const body = await req.json().catch(() => ({}));
   const title = String(body?.title ?? "").trim();
   if (!title) return bad("title required", 400);
 
   const payload: any = {
-    case_id: params.id,
+    case_id: id,
     title,
     kind: body?.kind ?? "draft",
     status: body?.status ?? "draft",

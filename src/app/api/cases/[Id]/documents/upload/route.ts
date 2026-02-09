@@ -16,10 +16,11 @@ function safeName(name: string) {
   return name.replace(/[^a-zA-Z0-9._-]/g, "_");
 }
 
-export async function POST(req: Request, { params }: { params: { id: string } }) {
+export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { supabase, user, res } = await requireUser();
   if (!user) return res;
 
+  const { id } = await params;
   const body = await req.json().catch(() => ({}));
   const filenameRaw = String(body?.filename ?? "").trim();
   const mimeType = String(body?.mime_type ?? body?.mimeType ?? "").trim() || "application/octet-stream";
@@ -29,12 +30,12 @@ export async function POST(req: Request, { params }: { params: { id: string } })
 
   const bucket = String(body?.bucket ?? "case-files");
   const filename = safeName(filenameRaw);
-  const objectPath = `${user.id}/${params.id}/${crypto.randomUUID()}-${filename}`;
+  const objectPath = `${user.id}/${id}/${crypto.randomUUID()}-${filename}`;
 
   const { data: row, error: rowErr } = await supabase
     .from("case_documents")
     .insert({
-      case_id: params.id,
+      case_id: id,
       filename,
       mime_type: mimeType,
       byte_size: byteSize,

@@ -51,7 +51,7 @@ export default async function CasesIndexPage() {
                 <div className="min-w-0">
                   <div className="truncate text-sm font-medium text-white">{c.title}</div>
                   <div className="text-xs text-white/60">
-                    Updated {fmt(c.updated_at)}{c.description ? ` • ${c.description}` : ""}
+                    Updated {fmt(c.updated_at)}
                   </div>
                 </div>
                 <div className="shrink-0 rounded-full border border-white/10 bg-black/20 px-2 py-1 text-xs text-white/70">

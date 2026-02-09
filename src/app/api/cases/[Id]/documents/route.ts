@@ -12,17 +12,18 @@ function bad(message: string, status = 400) {
   return NextResponse.json({ error: message }, { status });
 }
 
-export async function GET(req: Request, { params }: { params: { id: string } }) {
+export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { supabase, user, res } = await requireUser();
   if (!user) return res;
 
+  const { id } = await params;
   const url = new URL(req.url);
   const limit = Math.min(Math.max(Number(url.searchParams.get("limit") ?? 200), 1), 1000);
 
   const { data, error } = await supabase
     .from("case_documents")
     .select("id,case_id,filename,mime_type,byte_size,storage_bucket,storage_path,status,notes,tags,created_at,updated_at")
-    .eq("case_id", params.id)
+    .eq("case_id", id)
     .order("created_at", { ascending: false })
     .limit(limit);
 
@@ -30,16 +31,17 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
   return NextResponse.json({ items: data ?? [] });
 }
 
-export async function POST(req: Request, { params }: { params: { id: string } }) {
+export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { supabase, user, res } = await requireUser();
   if (!user) return res;
 
+  const { id } = await params;
   const body = await req.json().catch(() => ({}));
   const filename = String(body?.filename ?? "").trim();
   if (!filename) return bad("filename required", 400);
 
   const payload: any = {
-    case_id: params.id,
+    case_id: id,
     filename,
     mime_type: body?.mime_type ?? null,
     byte_size: body?.byte_size ?? null,

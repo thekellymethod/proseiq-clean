@@ -22,15 +22,16 @@ function mdToPlain(md: string) {
     .replace(/`([^`]+)`/g, "$1");
 }
 
-export async function GET(req: Request, { params }: { params: { id: string; draftId: string } }) {
+export async function GET(req: Request, { params }: { params: Promise<{ id: string; draftId: string }> }) {
   const { supabase, user, res } = await requireUser();
   if (!user) return res;
 
+  const { id, draftId } = await params;
   const { data: draft, error } = await supabase
     .from("case_drafts")
     .select("id,title,content_md,updated_at")
-    .eq("case_id", params.id)
-    .eq("id", params.draftId)
+    .eq("case_id", id)
+    .eq("id", draftId)
     .maybeSingle();
 
   if (error) return bad(error.message, 400);

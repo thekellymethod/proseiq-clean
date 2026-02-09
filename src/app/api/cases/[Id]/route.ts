@@ -14,21 +14,23 @@ function bad(message: string, status = 400) {
 
 const CASE_FIELDS = "id,title,status,case_type,priority,created_at,updated_at";
 
-export async function GET(_req: Request, { params }: { params: { id: string } }) {
+export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { supabase, user, res } = await requireUser();
   if (!user) return res;
 
-  const { data, error } = await supabase.from("cases").select(CASE_FIELDS).eq("id", params.id).single();
+  const { id } = await params;
+  const { data, error } = await supabase.from("cases").select(CASE_FIELDS).eq("id", id).single();
   if (error) return bad(error.message, 400);
   if (!data) return bad("Not found", 404);
 
   return NextResponse.json({ item: data });
 }
 
-export async function PATCH(req: Request, { params }: { params: { id: string } }) {
+export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { supabase, user, res } = await requireUser();
   if (!user) return res;
 
+  const { id } = await params;
   const body = await req.json().catch(() => ({}));
   const patch: Record<string, any> = {};
 
@@ -42,7 +44,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   const { data, error } = await supabase
     .from("cases")
     .update({ ...patch, updated_at: new Date().toISOString() })
-    .eq("id", params.id)
+    .eq("id", id)
     .select(CASE_FIELDS)
     .single();
 
@@ -50,11 +52,12 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   return NextResponse.json({ item: data });
 }
 
-export async function DELETE(_req: Request, { params }: { params: { id: string } }) {
+export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { supabase, user, res } = await requireUser();
   if (!user) return res;
 
-  const { error } = await supabase.from("cases").delete().eq("id", params.id);
+  const { id } = await params;
+  const { error } = await supabase.from("cases").delete().eq("id", id);
   if (error) return bad(error.message, 400);
 
   return NextResponse.json({ ok: true });

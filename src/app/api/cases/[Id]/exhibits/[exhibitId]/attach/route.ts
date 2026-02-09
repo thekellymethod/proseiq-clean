@@ -12,10 +12,11 @@ function bad(message: string, status = 400) {
   return NextResponse.json({ error: message }, { status });
 }
 
-export async function POST(req: Request, { params }: { params: { id: string; exhibitId: string } }) {
+export async function POST(req: Request, { params }: { params: Promise<{ id: string; exhibitId: string }> }) {
   const { supabase, user, res } = await requireUser();
   if (!user) return res;
 
+  const { id, exhibitId } = await params;
   const body = await req.json().catch(() => ({}));
   const docId = String(body?.docId ?? body?.document_id ?? "").trim();
   if (!docId) return bad("docId required", 400);
@@ -23,8 +24,8 @@ export async function POST(req: Request, { params }: { params: { id: string; exh
   const { data: ex, error: exErr } = await supabase
     .from("case_exhibits")
     .select("id")
-    .eq("case_id", params.id)
-    .eq("id", params.exhibitId)
+    .eq("case_id", id)
+    .eq("id", exhibitId)
     .maybeSingle();
   if (exErr) return bad(exErr.message, 400);
   if (!ex) return bad("Exhibit not found", 404);
@@ -32,7 +33,7 @@ export async function POST(req: Request, { params }: { params: { id: string; exh
   const { data: doc, error: docErr } = await supabase
     .from("case_documents")
     .select("id")
-    .eq("case_id", params.id)
+    .eq("case_id", id)
     .eq("id", docId)
     .maybeSingle();
   if (docErr) return bad(docErr.message, 400);
@@ -40,16 +41,17 @@ export async function POST(req: Request, { params }: { params: { id: string; exh
 
   const { error } = await supabase
     .from("case_exhibit_documents")
-    .insert({ exhibit_id: params.exhibitId, document_id: docId });
+    .insert({ exhibit_id: exhibitId, document_id: docId });
 
   if (error && !/duplicate/i.test(error.message)) return bad(error.message, 400);
   return NextResponse.json({ ok: true });
 }
 
-export async function DELETE(req: Request, { params }: { params: { id: string; exhibitId: string } }) {
+export async function DELETE(req: Request, { params }: { params: Promise<{ id: string; exhibitId: string }> }) {
   const { supabase, user, res } = await requireUser();
   if (!user) return res;
 
+  const { exhibitId } = await params;
   const url = new URL(req.url);
   const docId = url.searchParams.get("docId") ?? url.searchParams.get("document_id");
   if (!docId) return bad("docId required", 400);
@@ -57,7 +59,7 @@ export async function DELETE(req: Request, { params }: { params: { id: string; e
   const { error } = await supabase
     .from("case_exhibit_documents")
     .delete()
-    .eq("exhibit_id", params.exhibitId)
+    .eq("exhibit_id", exhibitId)
     .eq("document_id", docId);
 
   if (error) return bad(error.message, 400);

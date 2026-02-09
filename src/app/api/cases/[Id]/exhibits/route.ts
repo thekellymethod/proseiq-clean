@@ -12,17 +12,18 @@ function bad(message: string, status = 400) {
   return NextResponse.json({ error: message }, { status });
 }
 
-export async function GET(req: Request, { params }: { params: { id: string } }) {
+export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { supabase, user, res } = await requireUser();
   if (!user) return res;
 
   const url = new URL(req.url);
   const includeDocs = (url.searchParams.get("includeDocs") ?? "").toLowerCase() === "true";
 
+  const { id } = await params;
   const { data, error } = await supabase
     .from("case_exhibits")
     .select("id,case_id,exhibit_index,exhibit_label,title,description,kind,created_at,updated_at")
-    .eq("case_id", params.id)
+    .eq("case_id", id)
     .order("exhibit_index", { ascending: true });
 
   if (error) return bad(error.message, 400);
@@ -58,10 +59,11 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
   return NextResponse.json({ items: enriched });
 }
 
-export async function POST(req: Request, { params }: { params: { id: string } }) {
+export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { supabase, user, res } = await requireUser();
   if (!user) return res;
 
+  const { id } = await params;
   const body = await req.json().catch(() => ({}));
   const title = String(body?.title ?? "").trim();
   if (!title) return bad("title required", 400);
@@ -71,7 +73,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     const { data: last } = await supabase
       .from("case_exhibits")
       .select("exhibit_index")
-      .eq("case_id", params.id)
+      .eq("case_id", id)
       .order("exhibit_index", { ascending: false })
       .limit(1)
       .maybeSingle();
@@ -79,7 +81,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   }
 
   const payload: any = {
-    case_id: params.id,
+    case_id: id,
     title,
     description: body?.description ?? null,
     kind: body?.kind ?? "document",
@@ -97,10 +99,11 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   return NextResponse.json({ item: data });
 }
 
-export async function PATCH(req: Request, { params }: { params: { id: string } }) {
+export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { supabase, user, res } = await requireUser();
   if (!user) return res;
 
+  const { id } = await params;
   const body = await req.json().catch(() => ({}));
   const exhibitId = String(body?.exhibit_id ?? body?.id ?? "").trim();
   if (!exhibitId) return bad("exhibit_id required", 400);
@@ -112,7 +115,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   const { data, error } = await supabase
     .from("case_exhibits")
     .update(patch)
-    .eq("case_id", params.id)
+    .eq("case_id", id)
     .eq("id", exhibitId)
     .select("id,case_id,exhibit_index,exhibit_label,title,description,kind,created_at,updated_at")
     .single();
@@ -121,17 +124,18 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   return NextResponse.json({ item: data });
 }
 
-export async function DELETE(req: Request, { params }: { params: { id: string } }) {
+export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { supabase, user, res } = await requireUser();
   if (!user) return res;
 
+  const { id } = await params;
   const url = new URL(req.url);
   const exhibitId = url.searchParams.get("exhibit_id");
   if (!exhibitId) return bad("exhibit_id required", 400);
 
   await supabase.from("case_exhibit_documents").delete().eq("exhibit_id", exhibitId);
 
-  const { error } = await supabase.from("case_exhibits").delete().eq("case_id", params.id).eq("id", exhibitId);
+  const { error } = await supabase.from("case_exhibits").delete().eq("case_id", id).eq("id", exhibitId);
   if (error) return bad(error.message, 400);
 
   return NextResponse.json({ ok: true });

@@ -12,10 +12,11 @@ function bad(message: string, status = 400) {
   return NextResponse.json({ error: message }, { status });
 }
 
-export async function POST(req: Request, { params }: { params: { id: string } }) {
+export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { supabase, user, res } = await requireUser();
   if (!user) return res;
 
+  const { id } = await params;
   const body = await req.json().catch(() => ({}));
   const order: string[] = Array.isArray(body?.order) ? body.order : [];
   if (!order.length) return bad("order[] required", 400);
@@ -25,7 +26,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       supabase
         .from("case_exhibits")
         .update({ exhibit_index: i + 1, exhibit_label: `Exhibit ${i + 1}` })
-        .eq("case_id", params.id)
+        .eq("case_id", id)
         .eq("id", exhibitId)
     )
   );

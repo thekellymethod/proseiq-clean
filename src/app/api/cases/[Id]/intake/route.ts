@@ -22,33 +22,35 @@ async function getIntake(supabase: any, caseId: string) {
   return data ?? null;
 }
 
-export async function GET(_: Request, { params }: { params: { id: string } }) {
+export async function GET(_: Request, { params }: { params: Promise<{ id: string }> }) {
   const { supabase, user, res } = await requireUser();
   if (!user) return res;
 
+  const { id } = await params;
   try {
-    const item = await getIntake(supabase, params.id);
+    const item = await getIntake(supabase, id);
     return NextResponse.json({ item: item?.data ?? {} });
   } catch (e: any) {
     return NextResponse.json({ item: {}, warning: e?.message ?? "intake not ready" });
   }
 }
 
-export async function PATCH(req: Request, { params }: { params: { id: string } }) {
+export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { supabase, user, res } = await requireUser();
   if (!user) return res;
 
+  const { id } = await params;
   const body = await req.json().catch(() => ({}));
   const patch = body?.patch ?? null;
   if (!patch || typeof patch !== "object") return bad("patch object required", 400);
 
   try {
-    const current = await getIntake(supabase, params.id);
+    const current = await getIntake(supabase, id);
     const nextData = { ...(current?.data ?? {}), ...patch };
 
     const { data, error } = await supabase
       .from("case_intake")
-      .upsert({ case_id: params.id, data: nextData }, { onConflict: "case_id" })
+      .upsert({ case_id: id, data: nextData }, { onConflict: "case_id" })
       .select("case_id,data,updated_at")
       .single();
 

@@ -1,9 +1,12 @@
 // src/app/dashboard/cases/[id]/timeline/page.tsx
 import CaseWorkspaceShell from "@/components/case/CaseWorkspaceShell";
 import CaseTimeline from "@/components/case/CaseTimeline";
-import { getCaseById } from "@/lib/cases";
 
-export default async function CaseTimelinePage({ params }: { params: { id: string } }) {
-  const c = await getCaseById(params.id);
-
+export default async function CaseTimelinePage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  return (
+    <CaseWorkspaceShell caseId={id} active="timeline">
+      <CaseTimeline caseId={id} />
+    </CaseWorkspaceShell>
+  );
 }

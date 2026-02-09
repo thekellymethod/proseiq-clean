@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 
-export async function GET(req: Request, context: { params: { id: string } }) {
+export async function GET(req: Request, context: { params: Promise<{ id: string }> }) {
   const supabase = await createClient();
   const { data: auth } = await supabase.auth.getUser();
   if (!auth?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const caseId = context.params.id;
+  const { id: caseId } = await context.params;
 
   const url = new URL(req.url);
   const limit = Math.min(Number(url.searchParams.get("limit") ?? "200") || 200, 500);
@@ -22,12 +22,12 @@ export async function GET(req: Request, context: { params: { id: string } }) {
   return NextResponse.json({ items: data ?? [] });
 }
 
-export async function POST(req: Request, context: { params: { id: string } }) {
+export async function POST(req: Request, context: { params: Promise<{ id: string }> }) {
   const supabase = await createClient();
   const { data: auth } = await supabase.auth.getUser();
   if (!auth?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const caseId = context.params.id;
+  const { id: caseId } = await context.params;
 
   const body = await req.json().catch(() => ({}));
   const { event_at, title, kind = "note", notes = null } = body ?? {};

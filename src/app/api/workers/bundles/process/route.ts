@@ -13,7 +13,7 @@ function bad(message: string, status = 400) {
   return NextResponse.json({ error: message }, { status });
 }
 
-async function mdToPlain(md: string) {
+function mdToPlain(md: string) {
   return String(md ?? "")
     .replace(/\r/g, "")
     .replace(/^#{1,6}\s+/gm, "")

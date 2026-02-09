@@ -18,7 +18,7 @@ export default async function CaseWorkspaceShell({
   return (
     <Template
       title={c?.title ?? "Case"}
-      subtitle={c?.description ?? "Case workspace"}
+      subtitle="Case workspace"
       actions={<CaseHeaderActions caseId={caseId} status={c?.status ?? "active"} />}
     >
       <div className="space-y-4">

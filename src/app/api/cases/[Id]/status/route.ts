@@ -12,10 +12,11 @@ function bad(message: string, status = 400) {
   return NextResponse.json({ error: message }, { status });
 }
 
-export async function POST(req: Request, { params }: { params: { id: string } }) {
+export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { supabase, user, res } = await requireUser();
   if (!user) return res;
 
+  const { id } = await params;
   const body = await req.json().catch(() => ({}));
   const status = String(body?.status ?? "").trim();
   if (!status) return bad("status required", 400);
@@ -24,7 +25,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   const { data, error } = await supabase
     .from("cases")
     .update({ status })
-    .eq("id", params.id)
+    .eq("id", id)
     .select("id,status,updated_at")
     .single();
 

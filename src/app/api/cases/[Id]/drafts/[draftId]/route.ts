@@ -12,15 +12,16 @@ function bad(message: string, status = 400) {
   return NextResponse.json({ error: message }, { status });
 }
 
-export async function GET(_: Request, { params }: { params: { id: string; draftId: string } }) {
+export async function GET(_: Request, { params }: { params: Promise<{ id: string; draftId: string }> }) {
   const { supabase, user, res } = await requireUser();
   if (!user) return res;
 
+  const { id, draftId } = await params;
   const { data, error } = await supabase
     .from("case_drafts")
     .select("id,case_id,title,kind,status,content_md,created_at,updated_at")
-    .eq("case_id", params.id)
-    .eq("id", params.draftId)
+    .eq("case_id", id)
+    .eq("id", draftId)
     .maybeSingle();
 
   if (error) return bad(error.message, 400);
@@ -28,10 +29,11 @@ export async function GET(_: Request, { params }: { params: { id: string; draftI
   return NextResponse.json({ item: data });
 }
 
-export async function PATCH(req: Request, { params }: { params: { id: string; draftId: string } }) {
+export async function PATCH(req: Request, { params }: { params: Promise<{ id: string; draftId: string }> }) {
   const { supabase, user, res } = await requireUser();
   if (!user) return res;
 
+  const { id, draftId } = await params;
   const body = await req.json().catch(() => ({}));
   const patch: any = {};
   for (const k of ["title", "kind", "status", "content_md"]) if (k in body) patch[k] = body[k];
@@ -42,8 +44,8 @@ export async function PATCH(req: Request, { params }: { params: { id: string; dr
   const { data, error } = await supabase
     .from("case_drafts")
     .update(patch)
-    .eq("case_id", params.id)
-    .eq("id", params.draftId)
+    .eq("case_id", id)
+    .eq("id", draftId)
     .select("id,case_id,title,kind,status,content_md,created_at,updated_at")
     .single();
 
@@ -51,11 +53,12 @@ export async function PATCH(req: Request, { params }: { params: { id: string; dr
   return NextResponse.json({ item: data });
 }
 
-export async function DELETE(_: Request, { params }: { params: { id: string; draftId: string } }) {
+export async function DELETE(_: Request, { params }: { params: Promise<{ id: string; draftId: string }> }) {
   const { supabase, user, res } = await requireUser();
   if (!user) return res;
 
-  const { error } = await supabase.from("case_drafts").delete().eq("case_id", params.id).eq("id", params.draftId);
+  const { id, draftId } = await params;
+  const { error } = await supabase.from("case_drafts").delete().eq("case_id", id).eq("id", draftId);
   if (error) return bad(error.message, 400);
   return NextResponse.json({ ok: true });
 }

@@ -12,15 +12,16 @@ function bad(message: string, status = 400) {
   return NextResponse.json({ error: message }, { status });
 }
 
-export async function GET(_: Request, { params }: { params: { id: string; docId: string } }) {
+export async function GET(_: Request, { params }: { params: Promise<{ id: string; docId: string }> }) {
   const { supabase, user, res } = await requireUser();
   if (!user) return res;
 
+  const { id, docId } = await params;
   const { data, error } = await supabase
     .from("case_documents")
     .select("id,case_id,filename,mime_type,byte_size,storage_bucket,storage_path,status,notes,tags,created_at,updated_at")
-    .eq("case_id", params.id)
-    .eq("id", params.docId)
+    .eq("case_id", id)
+    .eq("id", docId)
     .maybeSingle();
 
   if (error) return bad(error.message, 400);
@@ -28,10 +29,11 @@ export async function GET(_: Request, { params }: { params: { id: string; docId:
   return NextResponse.json({ item: data });
 }
 
-export async function PATCH(req: Request, { params }: { params: { id: string; docId: string } }) {
+export async function PATCH(req: Request, { params }: { params: Promise<{ id: string; docId: string }> }) {
   const { supabase, user, res } = await requireUser();
   if (!user) return res;
 
+  const { id, docId } = await params;
   const body = await req.json().catch(() => ({}));
   const patch: any = {};
   for (const k of ["filename", "notes", "tags", "status"]) if (k in body) patch[k] = body[k];
@@ -42,8 +44,8 @@ export async function PATCH(req: Request, { params }: { params: { id: string; do
   const { data, error } = await supabase
     .from("case_documents")
     .update(patch)
-    .eq("case_id", params.id)
-    .eq("id", params.docId)
+    .eq("case_id", id)
+    .eq("id", docId)
     .select("id,case_id,filename,mime_type,byte_size,storage_bucket,storage_path,status,notes,tags,created_at,updated_at")
     .single();
 
@@ -51,15 +53,16 @@ export async function PATCH(req: Request, { params }: { params: { id: string; do
   return NextResponse.json({ item: data });
 }
 
-export async function DELETE(_: Request, { params }: { params: { id: string; docId: string } }) {
+export async function DELETE(_: Request, { params }: { params: Promise<{ id: string; docId: string }> }) {
   const { supabase, user, res } = await requireUser();
   if (!user) return res;
 
+  const { id, docId } = await params;
   const { data: doc, error: readErr } = await supabase
     .from("case_documents")
     .select("id,storage_bucket,storage_path")
-    .eq("case_id", params.id)
-    .eq("id", params.docId)
+    .eq("case_id", id)
+    .eq("id", docId)
     .maybeSingle();
 
   if (readErr) return bad(readErr.message, 400);
@@ -69,7 +72,7 @@ export async function DELETE(_: Request, { params }: { params: { id: string; doc
     await supabase.storage.from(doc.storage_bucket).remove([doc.storage_path]);
   }
 
-  const { error } = await supabase.from("case_documents").delete().eq("case_id", params.id).eq("id", params.docId);
+  const { error } = await supabase.from("case_documents").delete().eq("case_id", id).eq("id", docId);
   if (error) return bad(error.message, 400);
 
   return NextResponse.json({ ok: true });

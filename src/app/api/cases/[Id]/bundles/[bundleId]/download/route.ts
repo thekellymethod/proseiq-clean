@@ -12,15 +12,16 @@ function bad(message: string, status = 400) {
   return NextResponse.json({ error: message }, { status });
 }
 
-export async function GET(req: Request, { params }: { params: { id: string; bundleId: string } }) {
+export async function GET(req: Request, { params }: { params: Promise<{ id: string; bundleId: string }> }) {
   const { supabase, user, res } = await requireUser();
   if (!user) return res;
 
+  const { id, bundleId } = await params;
   const { data: bundle, error } = await supabase
     .from("case_bundles")
     .select("id,status,storage_bucket,storage_path,title")
-    .eq("case_id", params.id)
-    .eq("id", params.bundleId)
+    .eq("case_id", id)
+    .eq("id", bundleId)
     .maybeSingle();
 
   if (error) return bad(error.message, 400);

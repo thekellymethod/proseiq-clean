@@ -19,14 +19,15 @@ function lines(text: any): string[] {
     .filter(Boolean);
 }
 
-export async function POST(_: Request, { params }: { params: { id: string } }) {
+export async function POST(_: Request, { params }: { params: Promise<{ id: string }> }) {
   const { supabase, user, res } = await requireUser();
   if (!user) return res;
 
+  const { id } = await params;
   const { data: intakeRow } = await supabase
     .from("case_intake")
     .select("data")
-    .eq("case_id", params.id)
+    .eq("case_id", id)
     .maybeSingle();
 
   const intake = (intakeRow?.data ?? {}) as any;
@@ -34,7 +35,7 @@ export async function POST(_: Request, { params }: { params: { id: string } }) {
   const { data: existingEvents } = await supabase
     .from("case_events")
     .select("id")
-    .eq("case_id", params.id)
+    .eq("case_id", id)
     .limit(1);
 
   const now = new Date();
@@ -42,9 +43,9 @@ export async function POST(_: Request, { params }: { params: { id: string } }) {
 
   if (!existingEvents || existingEvents.length === 0) {
     const seedEvents = [
-      { case_id: params.id, event_at: now.toISOString(), kind: "note", title: "Intake captured", notes: "Baseline facts entered into ProseIQ intake." },
-      { case_id: params.id, event_at: plusDays(7), kind: "deadline", title: "Check/compute response deadlines", notes: "Verify service date and compute response deadline per forum rules." },
-      { case_id: params.id, event_at: plusDays(14), kind: "filing", title: "Draft first filing / response", notes: "Start with caption, jurisdictional allegations, and core elements." },
+      { case_id: id, event_at: now.toISOString(), kind: "note", title: "Intake captured", notes: "Baseline facts entered into ProseIQ intake." },
+      { case_id: id, event_at: plusDays(7), kind: "deadline", title: "Check/compute response deadlines", notes: "Verify service date and compute response deadline per forum rules." },
+      { case_id: id, event_at: plusDays(14), kind: "filing", title: "Draft first filing / response", notes: "Start with caption, jurisdictional allegations, and core elements." },
     ];
     const { error } = await supabase.from("case_events").insert(seedEvents);
     if (error) return bad(error.message, 400);
@@ -53,14 +54,14 @@ export async function POST(_: Request, { params }: { params: { id: string } }) {
   const { data: existingExhibits, error: exhibitsErr } = await supabase
     .from("case_exhibits")
     .select("id")
-    .eq("case_id", params.id)
+    .eq("case_id", id)
     .limit(1);
 
   if (!exhibitsErr && (!existingExhibits || existingExhibits.length === 0)) {
     const have = lines(intake?.evidence_have);
     const seed = (have.length ? have : ["Contract / agreement", "Communications (texts/emails)", "Invoices/receipts", "Bank records"]).slice(0, 12);
     const payload = seed.map((title: string, i: number) => ({
-      case_id: params.id,
+      case_id: id,
       title,
       description: "Seeded from intake. Attach documents and refine description.",
       exhibit_index: i + 1,
@@ -73,7 +74,7 @@ export async function POST(_: Request, { params }: { params: { id: string } }) {
   const { data: existingDrafts, error: draftsErr } = await supabase
     .from("case_drafts")
     .select("id")
-    .eq("case_id", params.id)
+    .eq("case_id", id)
     .limit(1);
 
   if (!draftsErr && (!existingDrafts || existingDrafts.length === 0)) {
@@ -83,7 +84,7 @@ export async function POST(_: Request, { params }: { params: { id: string } }) {
     const cause = intake?.case_number ?? "__________";
 
     const complaint = {
-      case_id: params.id,
+      case_id: id,
       kind: "pleading",
       status: "draft",
       title: "Petition / Complaint (draft)",
@@ -118,7 +119,7 @@ export async function POST(_: Request, { params }: { params: { id: string } }) {
     };
 
     const motion = {
-      case_id: params.id,
+      case_id: id,
       kind: "motion",
       status: "draft",
       title: "Motion (skeleton)",

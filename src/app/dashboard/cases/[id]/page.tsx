@@ -5,12 +5,13 @@ import CaseStrategy from "@/components/case/CaseStrategy"; // or your real "work
 export default async function Page({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }) {
+  const { id } = await params;
   return (
-    <CaseWorkspaceShell caseId={params.id} active="overview">
+    <CaseWorkspaceShell caseId={id} active="overview">
       {/* Workspace "home" content goes here */}
-      <CaseStrategy caseId={params.id} />
+      <CaseStrategy caseId={id} />
     </CaseWorkspaceShell>
   );
 }

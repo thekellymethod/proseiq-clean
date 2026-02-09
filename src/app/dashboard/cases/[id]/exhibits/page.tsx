@@ -1,13 +1,13 @@
 
 import CaseWorkspaceShell from "@/components/case/CaseWorkspaceShell";
 import CaseExhibits from "@/components/case/CaseExhibits";
-import { getCaseById } from "@/lib/cases";
 
 
-export default async function CaseExhibits({ params }: { params: { id: string } }) {
+export default async function CaseExhibitsPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   return (
-    <CaseWorkspaceShell caseId={params.id} active="analysis">
-      <CaseExhibits caseId={params.id} />
+    <CaseWorkspaceShell caseId={id} active="analysis">
+      <CaseExhibits caseId={id} />
     </CaseWorkspaceShell>
   );
 }

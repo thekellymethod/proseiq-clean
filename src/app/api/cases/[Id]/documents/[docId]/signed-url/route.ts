@@ -12,18 +12,19 @@ function bad(message: string, status = 400) {
   return NextResponse.json({ error: message }, { status });
 }
 
-export async function GET(req: Request, { params }: { params: { id: string; docId: string } }) {
+export async function GET(req: Request, { params }: { params: Promise<{ id: string; docId: string }> }) {
   const { supabase, user, res } = await requireUser();
   if (!user) return res;
 
+  const { id, docId } = await params;
   const url = new URL(req.url);
   const expiresIn = Math.min(Math.max(Number(url.searchParams.get("expiresIn") ?? 900), 60), 7 * 24 * 3600);
 
   const { data: doc, error } = await supabase
     .from("case_documents")
     .select("id,storage_bucket,storage_path,filename,mime_type")
-    .eq("case_id", params.id)
-    .eq("id", params.docId)
+    .eq("case_id", id)
+    .eq("id", docId)
     .maybeSingle();
 
   if (error) return bad(error.message, 400);

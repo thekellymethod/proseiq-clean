@@ -1,10 +1,11 @@
 import CaseWorkspaceShell from "@/components/case/CaseWorkspaceShell";
-import DraftEditor from "@/components/case/DraftEditor";
+import DraftsPanel from "@/components/case/DraftsPanel";
 
-export default async function CaseDraftPage({ params }: { params: { id: string; draftId: string } }) {
+export default async function CaseDraftPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   return (
-    <CaseWorkspaceShell caseId={params.id} active="drafts">
-      <DraftEditor caseId={params.id} draftId={params.draftId} />
+    <CaseWorkspaceShell caseId={id} active="drafts">
+      <DraftsPanel caseId={id} />
     </CaseWorkspaceShell>
   );
 }
