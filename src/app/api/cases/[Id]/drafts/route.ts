@@ -23,7 +23,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
 
   let query = supabase
     .from("case_drafts")
-    .select("id,case_id,title,kind,status,created_at,updated_at")
+    .select("id,case_id,title,kind,status,template_id,created_at,updated_at")
     .eq("case_id", id)
     .order("updated_at", { ascending: false })
     .limit(limit);
@@ -47,16 +47,19 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   const payload: any = {
     case_id: id,
+    created_by: user.id,
     title,
     kind: body?.kind ?? "draft",
     status: body?.status ?? "draft",
-    content_md: body?.content_md ?? body?.content ?? "",
+    content: body?.content ?? "",
+    content_rich: body?.content_rich ?? null,
+    template_id: body?.template_id ?? null,
   };
 
   const { data, error } = await supabase
     .from("case_drafts")
     .insert(payload)
-    .select("id,case_id,title,kind,status,created_at,updated_at")
+    .select("id,case_id,title,kind,status,template_id,created_at,updated_at")
     .single();
 
   if (error) return bad(error.message, 400);

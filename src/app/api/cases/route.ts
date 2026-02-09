@@ -23,7 +23,8 @@ export async function GET(req: Request) {
 
   let query = supabase
     .from("cases")
-    .select("id,title,status,case_type,priority,created_at,updated_at", { count: "exact" })
+    .select("id,title,status,created_at,updated_at", { count: "exact" })
+    .eq("created_by", user.id)
     .order("updated_at", { ascending: false })
     .limit(limit);
 
@@ -44,20 +45,26 @@ export async function POST(req: Request) {
   const title = String(body?.title ?? "").trim();
   if (!title) return bad("title required", 400);
 
+  const statusRaw = String(body?.status ?? "active").trim().toLowerCase();
+  const status = statusRaw === "archived" || statusRaw === "active" ? statusRaw : "active";
+
   const payload: any = {
     title,
-    status: body?.status ?? "active",
-    case_type: body?.case_type ?? null,
-    priority: body?.priority ?? "normal",
+    status,
     user_id: body?.user_id ?? null,
+    created_by: user.id,
+    updated_at: new Date().toISOString(),
   };
 
   const { data, error } = await supabase
     .from("cases")
     .insert(payload)
-    .select("id,title,status,case_type,priority,created_at,updated_at")
+    .select("id,title,status,created_at,updated_at")
     .single();
 
-  if (error) return bad(error.message, 400);
+  if (error) {
+    console.error("POST /api/cases insert failed", { message: error.message, code: (error as any).code, details: (error as any).details });
+    return bad(error.message, 400);
+  }
   return NextResponse.json({ item: data });
 }

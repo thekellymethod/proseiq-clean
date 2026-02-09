@@ -1,6 +1,5 @@
 //src/components/case/ProactiveCaseLaw.jsx
 import React, { useState, useEffect } from 'react';
-import { tsx } from '@/api/tsxClient';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -9,9 +8,12 @@ import { Sparkles, BookOpen, Loader2, Plus, RefreshCw } from 'lucide-react';
 export default function ProactiveCaseLaw({ caseData }) {
   const [suggestions, setSuggestions] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [pinned, setPinned] = useState([]);
 
   const generateSuggestions = async () => {
     setLoading(true);
+    setError(null);
 
     const prompt = `Based on this case information, suggest 5 highly relevant legal precedents and case law:
 
@@ -29,30 +31,26 @@ Provide 5 relevant case law suggestions with:
 - Why it's relevant to this case
 - Strength of relevance (high/medium/low)`;
 
-    const result = await tsx.integrations.Core.InvokeLLM({
-      prompt,
-      add_context_from_internet: true,
-      response_json_schema: {
-        type: 'object',
-        properties: {
-          suggestions: {
-            type: 'array',
-            items: {
-              type: 'object',
-              properties: {
-                citation: { type: 'string' },
-                holding: { type: 'string' },
-                relevance: { type: 'string' },
-                strength: { type: 'string' }
-              }
-            }
-          }
-        }
-      }
-    });
+    try {
+      const res = await fetch(`/api/cases/${caseData.id}/assistant`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prompt,
+          json: true,
+        }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(j?.error || `Request failed (${res.status})`);
 
-    setSuggestions(result.suggestions);
-    setLoading(false);
+      const result = j?.json || {};
+      setSuggestions(result.suggestions || []);
+    } catch (e) {
+      setError(e?.message || "Failed to generate suggestions.");
+      setSuggestions([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -66,12 +64,10 @@ Provide 5 relevant case law suggestions with:
   };
 
   const addToCaseLibrary = async (suggestion) => {
-    await tsx.entities.CaseLaw.create({
-      case_id: caseData.id,
-      citation: suggestion.citation,
-      case_name: suggestion.citation.split(',')[0],
-      holding: suggestion.holding,
-      relevance: suggestion.relevance
+    // TODO: persist to DB once a CaseLaw table + API exists.
+    setPinned((p) => {
+      if (p.some((x) => x.citation === suggestion.citation)) return p;
+      return [...p, suggestion];
     });
   };
 
@@ -98,6 +94,11 @@ Provide 5 relevant case law suggestions with:
         </div>
       </CardHeader>
       <CardContent className="p-6">
+        {error ? (
+          <div className="mb-4 rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+            {error}
+          </div>
+        ) : null}
         {loading && !suggestions ? (
           <div className="text-center py-8 text-slate-500">
             <Loader2 className="w-8 h-8 animate-spin mx-auto mb-2" />
@@ -135,6 +136,19 @@ Provide 5 relevant case law suggestions with:
                 </div>
               </div>
             ))}
+
+            {pinned?.length ? (
+              <div className="pt-2">
+                <div className="text-xs font-medium text-slate-600 mb-2">Pinned (local)</div>
+                <ul className="space-y-1">
+                  {pinned.map((p, idx) => (
+                    <li key={idx} className="text-xs text-slate-700">
+                      {p.citation}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
           </div>
         ) : (
           <p className="text-center text-slate-500 py-4">No suggestions available</p>

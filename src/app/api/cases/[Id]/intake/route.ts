@@ -14,8 +14,8 @@ function bad(message: string, status = 400) {
 
 async function getIntake(supabase: any, caseId: string) {
   const { data, error } = await supabase
-    .from("case_intake")
-    .select("case_id,data,updated_at,created_at")
+    .from("case_intakes")
+    .select("case_id,intake,updated_at,created_at")
     .eq("case_id", caseId)
     .maybeSingle();
   if (error) throw new Error(error.message);
@@ -29,7 +29,7 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
   const { id } = await params;
   try {
     const item = await getIntake(supabase, id);
-    return NextResponse.json({ item: item?.data ?? {} });
+    return NextResponse.json({ item: item?.intake ?? {} });
   } catch (e: any) {
     return NextResponse.json({ item: {}, warning: e?.message ?? "intake not ready" });
   }
@@ -46,16 +46,19 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
   try {
     const current = await getIntake(supabase, id);
-    const nextData = { ...(current?.data ?? {}), ...patch };
+    const nextIntake = { ...(current?.intake ?? {}), ...patch };
 
     const { data, error } = await supabase
-      .from("case_intake")
-      .upsert({ case_id: id, data: nextData }, { onConflict: "case_id" })
-      .select("case_id,data,updated_at")
+      .from("case_intakes")
+      .upsert({ case_id: id, intake: nextIntake, updated_at: new Date().toISOString() }, { onConflict: "case_id" })
+      .select("case_id,intake,updated_at")
       .single();
 
-    if (error) return bad(error.message, 400);
-    return NextResponse.json({ item: data?.data ?? nextData });
+    if (error) {
+      console.error("PATCH /api/cases/[id]/intake failed", { message: error.message, code: (error as any).code, details: (error as any).details });
+      return bad(error.message, 400);
+    }
+    return NextResponse.json({ item: data?.intake ?? nextIntake });
   } catch (e: any) {
     return bad(e?.message ?? "Failed to update intake", 400);
   }

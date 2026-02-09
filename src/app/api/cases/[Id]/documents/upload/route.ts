@@ -28,22 +28,24 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   if (!filenameRaw) return bad("filename required", 400);
 
-  const bucket = String(body?.bucket ?? "case-files");
+  const bucket = String(body?.bucket ?? "case-documents");
   const filename = safeName(filenameRaw);
   const objectPath = `${user.id}/${id}/${crypto.randomUUID()}-${filename}`;
 
   const { data: row, error: rowErr } = await supabase
-    .from("case_documents")
+    .from("documents")
     .insert({
       case_id: id,
+      created_by: user.id,
       filename,
       mime_type: mimeType,
-      byte_size: byteSize,
+      size_bytes: byteSize,
       storage_bucket: bucket,
       storage_path: objectPath,
-      status: "uploading",
+      kind: body?.kind ?? "general",
+      status: "active",
     })
-    .select("id,case_id,filename,mime_type,byte_size,storage_bucket,storage_path,status,created_at")
+    .select("id,case_id,filename,mime_type,size_bytes,storage_bucket,storage_path,kind,status,created_at,updated_at")
     .single();
 
   if (rowErr) return bad(rowErr.message, 400);
@@ -52,7 +54,19 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (error) return bad(error.message, 400);
 
   return NextResponse.json({
-    item: row,
+    item: {
+      id: row.id,
+      case_id: row.case_id,
+      filename: row.filename,
+      mime_type: row.mime_type ?? null,
+      byte_size: row.size_bytes ?? null,
+      storage_bucket: row.storage_bucket,
+      storage_path: row.storage_path,
+      kind: row.kind ?? null,
+      status: row.status,
+      created_at: row.created_at,
+      updated_at: row.updated_at,
+    },
     upload: {
       bucket,
       path: objectPath,

@@ -49,7 +49,7 @@ export default function DraftsPanel({ caseId }: { caseId: string }) {
           items.map((d) => (
             <Link
               key={d.id}
-              href={`/dashboard/drafts/${d.id}`}
+              href={`/dashboard/cases/${caseId}/drafts/${d.id}`}
               className="block rounded-lg border border-white/10 bg-black/20 p-3 hover:bg-black/30"
             >
               <div className="flex items-center justify-between gap-3">

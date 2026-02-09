@@ -19,7 +19,7 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
   const { id, bundleId } = await params;
   const { data, error } = await supabase
     .from("case_bundles")
-    .select("id,case_id,title,status,manifest,storage_bucket,storage_path,created_at,updated_at")
+    .select("id,case_id,title,status,kind,include_bates,bates_prefix,bates_start,manifest,output_path,error,created_at,updated_at")
     .eq("case_id", id)
     .eq("id", bundleId)
     .maybeSingle();
@@ -36,7 +36,9 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const { id, bundleId } = await params;
   const body = await req.json().catch(() => ({}));
   const patch: any = {};
-  for (const k of ["title", "status", "manifest", "storage_bucket", "storage_path"]) if (k in body) patch[k] = body[k];
+  for (const k of ["title", "status", "kind", "include_bates", "bates_prefix", "bates_start", "manifest", "output_path", "error"]) {
+    if (k in body) patch[k] = (body as any)[k];
+  }
   if ("title" in patch) patch.title = String(patch.title ?? "").trim();
 
   if (Object.keys(patch).length === 0) return bad("No fields to update", 400);
@@ -46,7 +48,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     .update(patch)
     .eq("case_id", id)
     .eq("id", bundleId)
-    .select("id,case_id,title,status,manifest,storage_bucket,storage_path,created_at,updated_at")
+    .select("id,case_id,title,status,kind,include_bates,bates_prefix,bates_start,manifest,output_path,error,created_at,updated_at")
     .single();
 
   if (error) return bad(error.message, 400);
@@ -58,17 +60,6 @@ export async function DELETE(_: Request, { params }: { params: Promise<{ id: str
   if (!user) return res;
 
   const { id, bundleId } = await params;
-  const { data: bundle } = await supabase
-    .from("case_bundles")
-    .select("storage_bucket,storage_path")
-    .eq("case_id", id)
-    .eq("id", bundleId)
-    .maybeSingle();
-
-  if (bundle?.storage_bucket && bundle?.storage_path) {
-    await supabase.storage.from(bundle.storage_bucket).remove([bundle.storage_path]);
-  }
-
   const { error } = await supabase.from("case_bundles").delete().eq("case_id", id).eq("id", bundleId);
   if (error) return bad(error.message, 400);
 

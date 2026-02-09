@@ -29,7 +29,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   const { id, draftId } = await params;
   const { data: draft, error } = await supabase
     .from("case_drafts")
-    .select("id,title,content_md,updated_at")
+    .select("id,title,content,updated_at,template_id,signature_bucket,signature_path,signature_name,signature_title")
     .eq("case_id", id)
     .eq("id", draftId)
     .maybeSingle();
@@ -49,14 +49,14 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   const page = pdf.addPage();
   const { width, height } = page.getSize();
 
-  const text = mdToPlain(draft.content_md ?? "");
+  const text = mdToPlain(draft.content ?? "");
   const title = String(draft.title ?? "Draft");
 
-  const font = await pdf.embedFont(StandardFonts.Helvetica);
+  const font = await pdf.embedFont(StandardFonts.TimesRoman);
   const fontSizeTitle = 16;
-  const fontSizeBody = 11;
+  const fontSizeBody = 12;
 
-  const margin = 48;
+  const margin = 72; // 1 inch
   let y = height - margin;
 
   page.drawText(title, { x: margin, y: y - fontSizeTitle, size: fontSizeTitle, font });
@@ -83,6 +83,41 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     if (y - lineHeight < margin) break;
     page.drawText(ln, { x: margin, y: y - lineHeight, size: fontSizeBody, font });
     y -= lineHeight;
+  }
+
+  // Signature block (optional)
+  if (draft.signature_bucket && draft.signature_path) {
+    const { data: blob, error: dlErr } = await supabase.storage.from(draft.signature_bucket).download(draft.signature_path);
+    if (!dlErr && blob) {
+      const imgBytes = new Uint8Array(await blob.arrayBuffer());
+      let img: any = null;
+      try {
+        img = await pdf.embedPng(imgBytes);
+      } catch {
+        try {
+          img = await pdf.embedJpg(imgBytes);
+        } catch {
+          img = null;
+        }
+      }
+
+      if (img) {
+        const maxSigW = 220;
+        const maxSigH = 90;
+        const scale = Math.min(maxSigW / img.width, maxSigH / img.height, 1);
+        const sigW = img.width * scale;
+        const sigH = img.height * scale;
+
+        const blockY = Math.max(margin, y - 140);
+        page.drawText("Signature:", { x: margin, y: blockY + sigH + 30, size: 10, font });
+        page.drawImage(img, { x: margin, y: blockY + 20, width: sigW, height: sigH });
+
+        const nameLine = String(draft.signature_name ?? "").trim();
+        const titleLine = String(draft.signature_title ?? "").trim();
+        if (nameLine) page.drawText(nameLine, { x: margin, y: blockY + 10, size: 10, font });
+        if (titleLine) page.drawText(titleLine, { x: margin, y: blockY - 2, size: 10, font });
+      }
+    }
   }
 
   let bytes = await pdf.save();

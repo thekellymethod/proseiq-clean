@@ -12,7 +12,7 @@ function bad(message: string, status = 400) {
   return NextResponse.json({ error: message }, { status });
 }
 
-const CASE_FIELDS = "id,title,status,case_type,priority,created_at,updated_at";
+const CASE_FIELDS = "id,title,status,created_at,updated_at";
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { supabase, user, res } = await requireUser();
@@ -36,8 +36,6 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
   if (body?.title != null) patch.title = String(body.title).trim();
   if (body?.status != null) patch.status = String(body.status).trim();
-  if (body?.case_type != null) patch.case_type = body.case_type ?? null;
-  if (body?.priority != null) patch.priority = String(body.priority).trim();
 
   if (Object.keys(patch).length === 0) return bad("No fields to update", 400);
 

@@ -12,6 +12,22 @@ function bad(message: string, status = 400) {
   return NextResponse.json({ error: message }, { status });
 }
 
+function mapDoc(row: any) {
+  return {
+    id: row.id,
+    case_id: row.case_id,
+    filename: row.filename,
+    mime_type: row.mime_type ?? null,
+    byte_size: row.size_bytes ?? null,
+    storage_bucket: row.storage_bucket,
+    storage_path: row.storage_path,
+    kind: row.kind ?? null,
+    status: row.status,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+  };
+}
+
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { supabase, user, res } = await requireUser();
   if (!user) return res;
@@ -21,14 +37,14 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   const limit = Math.min(Math.max(Number(url.searchParams.get("limit") ?? 200), 1), 1000);
 
   const { data, error } = await supabase
-    .from("case_documents")
-    .select("id,case_id,filename,mime_type,byte_size,storage_bucket,storage_path,status,notes,tags,created_at,updated_at")
+    .from("documents")
+    .select("id,case_id,filename,mime_type,size_bytes,storage_bucket,storage_path,kind,status,created_at,updated_at")
     .eq("case_id", id)
     .order("created_at", { ascending: false })
     .limit(limit);
 
   if (error) return bad(error.message, 400);
-  return NextResponse.json({ items: data ?? [] });
+  return NextResponse.json({ items: (data ?? []).map(mapDoc) });
 }
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -42,22 +58,22 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   const payload: any = {
     case_id: id,
+    created_by: user.id,
     filename,
     mime_type: body?.mime_type ?? null,
-    byte_size: body?.byte_size ?? null,
-    storage_bucket: body?.storage_bucket ?? "case-files",
+    size_bytes: body?.byte_size ?? body?.size_bytes ?? null,
+    storage_bucket: body?.storage_bucket ?? "case-documents",
     storage_path: body?.storage_path ?? null,
-    status: body?.status ?? "ready",
-    notes: body?.notes ?? null,
-    tags: body?.tags ?? null,
+    kind: body?.kind ?? "general",
+    status: body?.status ?? "active",
   };
 
   const { data, error } = await supabase
-    .from("case_documents")
+    .from("documents")
     .insert(payload)
-    .select("id,case_id,filename,mime_type,byte_size,storage_bucket,storage_path,status,notes,tags,created_at,updated_at")
+    .select("id,case_id,filename,mime_type,size_bytes,storage_bucket,storage_path,kind,status,created_at,updated_at")
     .single();
 
   if (error) return bad(error.message, 400);
-  return NextResponse.json({ item: data });
+  return NextResponse.json({ item: mapDoc(data) });
 }

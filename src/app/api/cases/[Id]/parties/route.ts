@@ -19,11 +19,14 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
   const { id } = await params;
   const { data, error } = await supabase
     .from("case_parties")
-    .select("id,case_id,role,name,email,phone,address,notes,created_at")
+    .select("id,case_id,role,name,notes,created_at")
     .eq("case_id", id)
     .order("created_at", { ascending: false });
 
-  if (error) return bad(error.message, 400);
+  if (error) {
+    console.error("GET /api/cases/[id]/parties failed", { message: error.message, code: (error as any).code, details: (error as any).details });
+    return bad(error.message, 400);
+  }
   return NextResponse.json({ items: data ?? [] });
 }
 
@@ -37,23 +40,35 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const name = String(body?.name ?? "").trim();
   if (!name) return bad("name required", 400);
 
+  const email = String(body?.email ?? "").trim();
+  const phone = String(body?.phone ?? "").trim();
+  const address = String(body?.address ?? "").trim();
+  const notesRaw = body?.notes != null ? String(body.notes) : "";
+  const notesParts = [
+    email ? `email: ${email}` : null,
+    phone ? `phone: ${phone}` : null,
+    address ? `address: ${address}` : null,
+    notesRaw.trim() ? `notes: ${notesRaw.trim()}` : null,
+  ].filter(Boolean) as string[];
+
   const payload: any = {
     case_id: id,
     role,
     name,
-    email: body?.email ?? null,
-    phone: body?.phone ?? null,
-    address: body?.address ?? null,
-    notes: body?.notes ?? null,
+    created_by: user.id,
+    notes: notesParts.length ? notesParts.join("\n") : null,
   };
 
   const { data, error } = await supabase
     .from("case_parties")
     .insert(payload)
-    .select("id,case_id,role,name,email,phone,address,notes,created_at")
+    .select("id,case_id,role,name,notes,created_at")
     .single();
 
-  if (error) return bad(error.message, 400);
+  if (error) {
+    console.error("POST /api/cases/[id]/parties failed", { message: error.message, code: (error as any).code, details: (error as any).details });
+    return bad(error.message, 400);
+  }
   return NextResponse.json({ item: data });
 }
 
@@ -67,7 +82,10 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
   if (!partyId) return bad("party_id required", 400);
 
   const { error } = await supabase.from("case_parties").delete().eq("case_id", id).eq("id", partyId);
-  if (error) return bad(error.message, 400);
+  if (error) {
+    console.error("DELETE /api/cases/[id]/parties failed", { message: error.message, code: (error as any).code, details: (error as any).details });
+    return bad(error.message, 400);
+  }
 
   return NextResponse.json({ ok: true });
 }

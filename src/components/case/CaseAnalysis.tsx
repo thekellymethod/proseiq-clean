@@ -1,5 +1,5 @@
-import CaseStrategy from "@/components/case/CaseStrategy";
+import CaseAnalysisPanel from "@/components/case/CaseAnalysisPanel";
 
 export default function CaseAnalysis({ caseId }: { caseId: string }) {
-  return <CaseStrategy caseId={caseId} />;
+  return <CaseAnalysisPanel caseId={caseId} />;
 }

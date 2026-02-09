@@ -25,7 +25,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     order.map((exhibitId, i) =>
       supabase
         .from("case_exhibits")
-        .update({ exhibit_index: i + 1, exhibit_label: `Exhibit ${i + 1}` })
+        .update({ sort_order: i + 1, exhibit_no: i + 1, label: `Exhibit ${i + 1}` })
         .eq("case_id", id)
         .eq("id", exhibitId)
     )

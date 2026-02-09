@@ -7,9 +7,6 @@ type PartyRow = {
   case_id: string;
   role: string;
   name: string;
-  email: string | null;
-  phone: string | null;
-  address: string | null;
   notes: string | null;
   created_at: string;
 };
@@ -40,7 +37,7 @@ export function CaseParties({ caseId }: { caseId: string }) {
 
   const [role, setRole] = React.useState("other");
   const [name, setName] = React.useState("");
-  const [email, setEmail] = React.useState("");
+  const [notes, setNotes] = React.useState("");
 
   async function refresh() {
     setError(null);
@@ -70,11 +67,11 @@ export function CaseParties({ caseId }: { caseId: string }) {
         body: JSON.stringify({
           role,
           name: name.trim(),
-          email: email.trim() || null,
+          notes: notes.trim() || null,
         }),
       });
       setName("");
-      setEmail("");
+      setNotes("");
       await refresh();
     } catch (e: any) {
       setError(e?.message ?? "Failed to create party");
@@ -114,9 +111,9 @@ export function CaseParties({ caseId }: { caseId: string }) {
             className="rounded bg-black/20 p-2 text-white placeholder:text-white/40"
           />
           <input
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="Email (optional)"
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="Notes (optional)"
             className="rounded bg-black/20 p-2 text-white placeholder:text-white/40"
           />
         </div>
@@ -147,7 +144,7 @@ export function CaseParties({ caseId }: { caseId: string }) {
                     <span className="text-white/60">{p.role}</span> · {p.name}
                   </div>
                   <div className="truncate text-xs text-white/60">
-                    {p.email ? p.email : "—"} · {fmtDate(p.created_at)}
+                    {p.notes ? p.notes : "—"} · {fmtDate(p.created_at)}
                   </div>
                 </div>
                 <button

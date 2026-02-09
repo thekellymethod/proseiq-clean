@@ -6,13 +6,13 @@ import React from "react";
 type DocRow = {
   id: string;
   filename: string;
-  content_type: string | null;
-  bytes: number | null;
+  mime_type: string | null;
+  byte_size: number | null;
   storage_bucket: string;
   storage_path: string;
   created_at: string;
-  notes: string | null;
-  tags: string[];
+  kind?: string | null;
+  status?: string;
 };
 
 async function jsonFetch(url: string, init?: RequestInit) {
@@ -71,12 +71,12 @@ export default function CaseDocuments({ params }: { params: { caseId: string } }
     setError(null);
     setUploading(true);
     try {
-      const up = await jsonFetch(`/api/cases/${caseId}/documents/signed-upload`, {
+      const up = await jsonFetch(`/api/cases/${caseId}/documents/upload`, {
         method: "POST",
-        body: JSON.stringify({ filename: file.name, content_type: file.type || "application/octet-stream", bytes: file.size }),
+        body: JSON.stringify({ filename: file.name, mime_type: file.type || "application/octet-stream", byte_size: file.size }),
       });
 
-      const putRes = await fetch(up.signedUrl, {
+      const putRes = await fetch(up.upload?.signedUrl, {
         method: "PUT",
         headers: { "Content-Type": file.type || "application/octet-stream" },
         body: file,
@@ -86,19 +86,6 @@ export default function CaseDocuments({ params }: { params: { caseId: string } }
         const t = await putRes.text().catch(() => "");
         throw new Error(`Upload failed (${putRes.status}): ${t.slice(0, 200)}`);
       }
-
-      await jsonFetch(`/api/cases/${caseId}/documents`, {
-        method: "POST",
-        body: JSON.stringify({
-          filename: file.name,
-          content_type: file.type || "application/octet-stream",
-          bytes: file.size,
-          storage_bucket: up.bucket,
-          storage_path: up.path,
-          tags: [],
-          notes: null,
-        }),
-      });
 
       await refresh();
     } catch (e: any) {
@@ -111,11 +98,10 @@ export default function CaseDocuments({ params }: { params: { caseId: string } }
   async function download(docId: string) {
     setError(null);
     try {
-      const j = await jsonFetch(`/api/cases/${caseId}/documents/signed-url`, {
-        method: "POST",
-        body: JSON.stringify({ doc_id: docId }),
-      });
-      window.open(j.url, "_blank", "noopener,noreferrer");
+      const j = await jsonFetch(`/api/cases/${caseId}/documents/${docId}/signed-url`, { method: "GET" });
+      const url = String(j.signedUrl ?? "");
+      if (!url) throw new Error("Missing signedUrl");
+      window.open(url, "_blank", "noopener,noreferrer");
     } catch (e: any) {
       setError(e?.message ?? "Failed");
     }
@@ -124,7 +110,7 @@ export default function CaseDocuments({ params }: { params: { caseId: string } }
   async function remove(docId: string) {
     setError(null);
     try {
-      await jsonFetch(`/api/cases/${caseId}/documents?doc_id=${encodeURIComponent(docId)}`, { method: "DELETE" });
+      await jsonFetch(`/api/cases/${caseId}/documents/${docId}`, { method: "DELETE" });
       setItems((p) => p.filter((x) => x.id !== docId));
     } catch (e: any) {
       setError(e?.message ?? "Failed");
@@ -176,7 +162,7 @@ export default function CaseDocuments({ params }: { params: { caseId: string } }
                 <div className="min-w-0">
                   <div className="text-sm font-medium text-white truncate">{d.filename}</div>
                   <div className="mt-1 text-xs text-white/60">
-                    {fmtBytes(d.bytes)} • {d.content_type || "unknown"} • {fmtDate(d.created_at)}
+                    {fmtBytes(d.byte_size)} • {d.mime_type || "unknown"} • {fmtDate(d.created_at)}
                   </div>
                   <div className="mt-2 text-xs text-white/50 font-mono truncate">{d.storage_path}</div>
                 </div>

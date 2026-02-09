@@ -21,7 +21,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   const expiresIn = Math.min(Math.max(Number(url.searchParams.get("expiresIn") ?? 900), 60), 7 * 24 * 3600);
 
   const { data: doc, error } = await supabase
-    .from("case_documents")
+    .from("documents")
     .select("id,storage_bucket,storage_path,filename,mime_type")
     .eq("case_id", id)
     .eq("id", docId)
