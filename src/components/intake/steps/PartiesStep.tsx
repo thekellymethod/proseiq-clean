@@ -2,28 +2,18 @@
 
 import React from "react";
 
-type Party = {
-  role: "plaintiff" | "defendant" | "witness" | "other";
-  name: string;
-  email?: string;
-  phone?: string;
-  notes?: string;
-};
-
-type IntakeData = {
-  parties?: Party[];
-};
+import type { IntakeData, IntakeParty } from "@/components/intake/types";
 
 export default function PartiesStep({
   data,
   setData,
 }: {
   data: IntakeData;
-  setData: (next: IntakeData) => void;
+  setData: React.Dispatch<React.SetStateAction<IntakeData>>;
 }) {
   const parties = data.parties ?? [];
 
-  function updateParty(i: number, patch: Partial<Party>) {
+  function updateParty(i: number, patch: Partial<IntakeParty>) {
     const next = parties.map((p, idx) => (idx === i ? { ...p, ...patch } : p));
     setData({ ...data, parties: next });
   }
@@ -80,11 +70,13 @@ export default function PartiesStep({
                     className="w-full rounded-md border border-white/10 bg-black/30 px-3 py-2 text-white outline-none focus:border-amber-300/40"
                     value={p.role}
                     onChange={(e) =>
-                      updateParty(i, { role: e.target.value as Party["role"] })
+                      updateParty(i, { role: e.target.value as IntakeParty["role"] })
                     }
                   >
                     <option value="plaintiff">Plaintiff</option>
                     <option value="defendant">Defendant</option>
+                    <option value="petitioner">Petitioner</option>
+                    <option value="respondent">Respondent</option>
                     <option value="witness">Witness</option>
                     <option value="other">Other</option>
                   </select>

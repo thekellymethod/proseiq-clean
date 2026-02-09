@@ -42,7 +42,8 @@ function fmtDate(iso: string) {
   }
 }
 
-export default function CaseDocuments({ caseId }: { caseId: string }) {
+export default function CaseDocuments({ params }: { params: { caseId: string } }) {
+  const { caseId } = params;
   const [items, setItems] = React.useState<DocRow[]>([]);
   const [error, setError] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState(true);

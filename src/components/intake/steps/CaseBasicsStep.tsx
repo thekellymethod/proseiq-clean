@@ -2,22 +2,14 @@
 
 import React from "react";
 
-type IntakeData = {
-  basics?: {
-    title?: string;
-    description?: string;
-    court?: string;
-    jurisdiction?: string;
-    caseNumber?: string;
-  };
-};
+import type { IntakeData } from "@/components/intake/types";
 
 export default function CaseBasicsStep({
   data,
   setData,
 }: {
   data: IntakeData;
-  setData: (next: IntakeData) => void;
+  setData: React.Dispatch<React.SetStateAction<IntakeData>>;
 }) {
   const basics = data.basics ?? {};
 

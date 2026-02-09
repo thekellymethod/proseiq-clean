@@ -1,13 +1,10 @@
-
+import { default as CaseDocuments } from "@/components/case/CaseDocuments";
 import CaseWorkspaceShell from "@/components/case/CaseWorkspaceShell";
-import  CaseDocuments  from "@/components/case/CaseDocuments";
-import { getCaseById } from "@/lib/cases";
 
-
-export default async function CaseDocumentsPage({ params }: { params: { id: string } }) {
+export default function CaseDocumentsPage({ params }: { params: { caseId: string } }) {
   return (
-    <CaseWorkspaceShell caseId={params.id} active="analysis">
-      <CaseDocuments caseId={params.id} />
+    <CaseWorkspaceShell caseId={params.caseId} active="documents">
+      <CaseDocuments params={params} />
     </CaseWorkspaceShell>
   );
 }

@@ -2,21 +2,14 @@
 
 import React from "react";
 
-type EvidenceItem = {
-  label: string;
-  notes?: string;
-};
-
-type IntakeData = {
-  evidence?: EvidenceItem[];
-};
+import type { EvidenceItem, IntakeData } from "@/components/intake/types";
 
 export default function EvidenceStep({
   data,
   setData,
 }: {
   data: IntakeData;
-  setData: (next: IntakeData) => void;
+  setData: React.Dispatch<React.SetStateAction<IntakeData>>;
 }) {
   const evidence = data.evidence ?? [];
 

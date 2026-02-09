@@ -2,19 +2,14 @@
 
 import React from "react";
 
-type IntakeData = {
-  facts?: {
-    narrative?: string;
-    keyDates?: string;
-  };
-};
+import type { IntakeData } from "@/components/intake/types";
 
 export default function FactsStep({
   data,
   setData,
 }: {
   data: IntakeData;
-  setData: (next: IntakeData) => void;
+  setData: React.Dispatch<React.SetStateAction<IntakeData>>;
 }) {
   const facts = data.facts ?? {};
 

@@ -2,25 +2,14 @@
 
 import React from "react";
 
-type DamageItem = {
-  label: string;
-  amount?: number;
-  notes?: string;
-};
-
-type IntakeData = {
-  damages?: {
-    items?: DamageItem[];
-    narrative?: string;
-  };
-};
+import type { DamageItem, IntakeData } from "@/components/intake/types";
 
 export default function DamagesStep({
   data,
   setData,
 }: {
   data: IntakeData;
-  setData: (next: IntakeData) => void;
+  setData: React.Dispatch<React.SetStateAction<IntakeData>>;
 }) {
   const damages = data.damages ?? {};
   const items = damages.items ?? [];
