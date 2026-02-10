@@ -22,7 +22,7 @@ export default async function AppHeader() {
         <div className="flex items-center gap-3">
           <Link href="/dashboard" className="flex items-center gap-3">
             <Image
-              src="/proseiq-logo-512-a.png"
+              src="/logo.PNG"
               alt="ProseIQ"
               width={56}
               height={56}
