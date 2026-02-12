@@ -62,7 +62,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
   try {
     const current = await getIntake(supabase, id);
-    const nextIntake = { ...(current?.intake ?? {}), ...patch };
+    const currentIntake = current?.intake ?? {};
+    const nextIntake = { ...currentIntake, ...patch };
 
     const { data, error } = await supabase
       .from("case_intakes")
@@ -75,17 +76,20 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       return bad(error.message, 400);
     }
 
-    // Best-effort enqueue for proactive analysis.
-    try {
-      await enqueueJob(supabase, user.id, {
-        caseId: id,
-        jobType: "intake_updated",
-        sourceType: "case_intakes",
-        sourceId: null,
-        payload: { patchKeys: Object.keys(patch ?? {}) },
-      });
-    } catch {
-      // ignore
+    // Only enqueue analysis when data actually changed (avoids re-analysis on every page load)
+    const hasChanged = JSON.stringify(nextIntake) !== JSON.stringify(currentIntake);
+    if (hasChanged) {
+      try {
+        await enqueueJob(supabase, user.id, {
+          caseId: id,
+          jobType: "intake_updated",
+          sourceType: "case_intakes",
+          sourceId: null,
+          payload: { patchKeys: Object.keys(patch ?? {}) },
+        });
+      } catch {
+        // ignore
+      }
     }
 
     return NextResponse.json({ item: data?.intake ?? nextIntake });

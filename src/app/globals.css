@@ -16,3 +16,12 @@ body {
   margin: 0;
 }
 
+/* Dropdown menus: dark background for contrast with white text */
+select {
+  color-scheme: dark;
+}
+select option {
+  background: #0a1931;
+  color: #fff;
+}
+

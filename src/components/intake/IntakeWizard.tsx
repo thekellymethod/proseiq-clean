@@ -10,6 +10,7 @@ import EvidenceStep from "@/components/intake/steps/EvidenceStep";
 import ReviewGenerateStep from "@/components/intake/steps/ReviewGenerateStep";
 
 import { emptyIntakeData, type IntakeData } from "@/components/intake/types";
+import { useAutosave } from "@/components/intake/useAutosave";
 
 type StepKey = "basics" | "parties" | "claims" | "facts" | "damages" | "evidence" | "review";
 
@@ -75,7 +76,7 @@ export default function IntakeWizard({ caseId }: { caseId: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [caseId]);
 
-  async function save() {
+  const saveFn = React.useCallback(async () => {
     setBusy(true);
     setError(null);
     try {
@@ -91,7 +92,11 @@ export default function IntakeWizard({ caseId }: { caseId: string }) {
     } finally {
       setBusy(false);
     }
-  }
+  }, [caseId, data]);
+
+  useAutosave(saveFn, data, { debounceMs: 2500 });
+
+  const save = saveFn;
 
   async function seed() {
     setBusy(true);

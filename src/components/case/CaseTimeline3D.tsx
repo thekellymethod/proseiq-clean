@@ -1,8 +1,9 @@
 "use client";
 
 import React from "react";
-import { Canvas } from "@react-three/fiber";
+import { Canvas, useThree } from "@react-three/fiber";
 import { Html, Line, OrbitControls } from "@react-three/drei";
+import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 
 type EventRow = {
   id: string;
@@ -54,9 +55,13 @@ function laneY(kind?: string | null) {
   }
 }
 
-function clamp(n: number, min: number, max: number) {
-  return Math.max(min, Math.min(max, n));
-}
+const LANE_CONFIG = [
+  { kind: "deadline", y: 1.6, label: "Deadline", color: "#fb7185" },
+  { kind: "hearing", y: 0.8, label: "Hearing", color: "#60a5fa" },
+  { kind: "filing", y: 0, label: "Filing", color: "#34d399" },
+  { kind: "evidence", y: -0.8, label: "Evidence", color: "#fbbf24" },
+  { kind: "note", y: -1.6, label: "Note", color: "#a78bfa" },
+] as const;
 
 function computePositions(items: EventRow[]) {
   const parsed = items
@@ -68,15 +73,12 @@ function computePositions(items: EventRow[]) {
   const maxT = parsed[parsed.length - 1]?.t ?? minT;
   const span = Math.max(1, maxT - minT);
 
-  // Keep things within a small-ish box for sane controls
   const xMin = -5;
   const xMax = 5;
 
   const nodes = parsed.map(({ e, t }, idx) => {
     const u = (t - minT) / span;
     const x = xMin + u * (xMax - xMin);
-
-    // Small deterministic z jitter so overlapping dots are clickable
     const z = ((idx % 7) - 3) * 0.12;
     const y = laneY(e.kind ?? "note");
 
@@ -94,12 +96,14 @@ function computePositions(items: EventRow[]) {
 function Node({
   e,
   selected,
+  upcoming,
   onSelect,
   onHover,
   onUnhover,
 }: {
   e: EventRow & { x: number; y: number; z: number };
   selected: boolean;
+  upcoming: boolean;
   onSelect: (id: string) => void;
   onHover: (id: string) => void;
   onUnhover: () => void;
@@ -109,8 +113,20 @@ function Node({
   const color = overdue ? "#ef4444" : base;
   const r = selected ? 0.22 : 0.16;
 
+  // When selected: stay in same XY plane, enlarge in XZ plane and bring forward
+  const zOffset = selected ? 2.5 : 0;
+  const scale = selected ? 1.8 : 1;
+
+  // Glow when selected or when this is the next upcoming future event
+  const shouldGlow = selected || upcoming;
+  const emissive = shouldGlow ? color : "#000000";
+  const emissiveIntensity = selected ? 0.35 : upcoming ? 0.4 : 0;
+
   return (
-    <group position={[e.x, e.y, e.z]}>
+    <group
+      position={[e.x, e.y, e.z + zOffset]}
+      scale={[scale, scale, scale]}
+    >
       <mesh
         onPointerOver={(ev) => {
           ev.stopPropagation();
@@ -126,7 +142,11 @@ function Node({
         }}
       >
         <sphereGeometry args={[r, 24, 24]} />
-        <meshStandardMaterial color={color} emissive={selected ? color : "#000000"} emissiveIntensity={selected ? 0.35 : 0} />
+        <meshStandardMaterial
+          color={color}
+          emissive={emissive}
+          emissiveIntensity={emissiveIntensity}
+        />
       </mesh>
       {selected ? (
         <Html distanceFactor={8} position={[0, r + 0.12, 0]} center>
@@ -138,6 +158,82 @@ function Node({
       ) : null}
     </group>
   );
+}
+
+function LaneLabel({
+  y,
+  label,
+  color,
+  count,
+}: {
+  y: number;
+  label: string;
+  color: string;
+  count?: number;
+}) {
+  const displayLabel = count !== undefined && count > 0 ? `${label} (${count})` : label;
+  return (
+    <group position={[-7.2, y, -0.2]}>
+      <Html center transform distanceFactor={12}>
+        <div
+          className="whitespace-nowrap text-xs font-medium drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]"
+          style={{ color }}
+        >
+          {displayLabel}
+        </div>
+      </Html>
+    </group>
+  );
+}
+
+const INITIAL_CAMERA = {
+  position: [0, 2.2, 10] as [number, number, number],
+  target: [0, 0, 0] as [number, number, number],
+  fov: 55,
+};
+
+function SceneController({
+  controlsRef,
+  onArrowKey,
+  onEscape,
+}: {
+  controlsRef: React.RefObject<OrbitControlsImpl | null>;
+  onArrowKey: (dir: "up" | "down" | "left" | "right") => void;
+  onEscape: () => void;
+}) {
+  const { camera } = useThree();
+
+  React.useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        camera.position.set(...INITIAL_CAMERA.position);
+        const ctrl = controlsRef.current;
+        if (ctrl?.target) {
+          ctrl.target.set(...INITIAL_CAMERA.target);
+        }
+        onEscape();
+        return;
+      }
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        onArrowKey("up");
+      } else if (e.key === "ArrowDown") {
+        e.preventDefault();
+        onArrowKey("down");
+      } else if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        onArrowKey("left");
+      } else if (e.key === "ArrowRight") {
+        e.preventDefault();
+        onArrowKey("right");
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [camera, controlsRef, onArrowKey, onEscape]);
+
+  return null;
 }
 
 export default function CaseTimeline3D({
@@ -153,6 +249,8 @@ export default function CaseTimeline3D({
 
   const [selectedId, setSelectedId] = React.useState<string | null>(null);
   const [hoveredId, setHoveredId] = React.useState<string | null>(null);
+
+  const controlsRef = React.useRef<OrbitControlsImpl | null>(null);
 
   async function load() {
     setLoading(true);
@@ -175,13 +273,86 @@ export default function CaseTimeline3D({
   }, [caseId]);
 
   const { nodes, axisPoints } = React.useMemo(() => computePositions(items), [items]);
+
+  // Re-check which event is next upcoming every 30s so glow moves when time passes
+  const [tick, setTick] = React.useState(0);
+  React.useEffect(() => {
+    const id = setInterval(() => setTick((t) => t + 1), 30_000);
+    return () => clearInterval(id);
+  }, []);
+
+  const nextUpcomingId = React.useMemo(() => {
+    const now = Date.now();
+    const future = nodes
+      .filter((n) => new Date(n.event_at).getTime() > now)
+      .sort((a, b) => new Date(a.event_at).getTime() - new Date(b.event_at).getTime());
+    return future[0]?.id ?? null;
+  }, [nodes, tick]);
+
+  const laneCounts = React.useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const cfg of LANE_CONFIG) {
+      counts[cfg.kind] = nodes.filter((n) => laneY(n.kind ?? "note") === cfg.y).length;
+    }
+    return counts;
+  }, [nodes]);
   const selected = React.useMemo(() => nodes.find((n) => n.id === selectedId) ?? null, [nodes, selectedId]);
   const hovered = React.useMemo(() => nodes.find((n) => n.id === hoveredId) ?? null, [nodes, hoveredId]);
 
-  function select(id: string) {
-    setSelectedId(id);
-    onSelectEventId?.(id);
-  }
+  const select = React.useCallback(
+    (id: string) => {
+      setSelectedId(id);
+      onSelectEventId?.(id);
+    },
+    [onSelectEventId]
+  );
+
+  const handleEscape = React.useCallback(() => {
+    setSelectedId(null);
+  }, []);
+
+  const handleArrowKey = React.useCallback(
+    (dir: "up" | "down" | "left" | "right") => {
+      if (nodes.length === 0) return;
+
+      const selectedNode = selectedId ? nodes.find((n) => n.id === selectedId) : null;
+
+      if (dir === "left" || dir === "right") {
+        // Stay on same lane (same Y): only move along X within that lane
+        const laneY = selectedNode?.y ?? 0;
+        const sameLane = nodes.filter((n) => n.y === laneY).sort((a, b) => a.x - b.x);
+        const idx = selectedId ? sameLane.findIndex((n) => n.id === selectedId) : -1;
+
+        let nextIdx: number;
+        if (dir === "left") {
+          nextIdx = idx <= 0 ? 0 : idx - 1;
+        } else {
+          nextIdx = idx < 0 ? 0 : Math.min(sameLane.length - 1, idx + 1);
+        }
+        const nextId = sameLane[nextIdx]?.id;
+        if (nextId) select(nextId);
+        return;
+      }
+
+      // Up/Down: move to different lane (different line)
+      const sortedByYThenX = [...nodes].sort((a, b) => {
+        if (a.y !== b.y) return b.y - a.y; // higher Y first
+        return a.x - b.x;
+      });
+      const currentIdx = selectedId ? sortedByYThenX.findIndex((n) => n.id === selectedId) : -1;
+      const nextIdx =
+        dir === "up"
+          ? currentIdx < 0
+            ? 0
+            : Math.max(0, currentIdx - 1)
+          : currentIdx < 0
+            ? 0
+            : Math.min(sortedByYThenX.length - 1, currentIdx + 1);
+      const nextId = sortedByYThenX[nextIdx]?.id;
+      if (nextId) select(nextId);
+    },
+    [nodes, selectedId, select]
+  );
 
   return (
     <section className="rounded-xl border border-white/10 bg-white/5 p-4">
@@ -189,7 +360,7 @@ export default function CaseTimeline3D({
         <div className="min-w-0">
           <h3 className="font-semibold text-white">3D timeline</h3>
           <p className="text-sm text-white/70">
-            Visualize events in space. Click a node to inspect; edit events in the list view.
+            Visualize events in space. Click a node to inspect; use arrow keys to navigate; ESC to reset view.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -215,31 +386,55 @@ export default function CaseTimeline3D({
               <div className="absolute inset-0 flex items-center justify-center text-sm text-white/60">Loading…</div>
             ) : null}
 
-            <Canvas camera={{ position: [0, 2.2, 10], fov: 55 }}>
+            <Canvas camera={{ position: INITIAL_CAMERA.position, fov: INITIAL_CAMERA.fov }}>
               <ambientLight intensity={0.7} />
               <directionalLight position={[3, 6, 4]} intensity={0.8} />
 
+              <SceneController
+                controlsRef={controlsRef}
+                onArrowKey={handleArrowKey}
+                onEscape={handleEscape}
+              />
+
               <Line points={axisPoints} color="#94a3b8" lineWidth={1} />
 
-              {/* Lane guides */}
-              <Line points={[[-5, 1.6, -0.2], [5, 1.6, -0.2]]} color="#334155" />
-              <Line points={[[-5, 0.8, -0.2], [5, 0.8, -0.2]]} color="#334155" />
-              <Line points={[[-5, 0, -0.2], [5, 0, -0.2]]} color="#334155" />
-              <Line points={[[-5, -0.8, -0.2], [5, -0.8, -0.2]]} color="#334155" />
-              <Line points={[[-5, -1.6, -0.2], [5, -1.6, -0.2]]} color="#334155" />
+              {LANE_CONFIG.map((cfg) => (
+                <React.Fragment key={cfg.kind}>
+                  <Line
+                    points={[
+                      [-5, cfg.y, -0.2],
+                      [5, cfg.y, -0.2],
+                    ]}
+                    color={cfg.color}
+                  />
+                  <LaneLabel
+                    y={cfg.y}
+                    label={cfg.label}
+                    color={cfg.color}
+                    count={laneCounts[cfg.kind]}
+                  />
+                </React.Fragment>
+              ))}
 
               {nodes.map((e) => (
                 <Node
                   key={e.id}
                   e={e}
                   selected={e.id === selectedId}
+                  upcoming={e.id === nextUpcomingId}
                   onSelect={select}
                   onHover={setHoveredId}
                   onUnhover={() => setHoveredId(null)}
                 />
               ))}
 
-              <OrbitControls enableDamping dampingFactor={0.12} rotateSpeed={0.6} maxPolarAngle={Math.PI / 2} />
+              <OrbitControls
+                ref={controlsRef}
+                enableDamping
+                dampingFactor={0.12}
+                rotateSpeed={0.6}
+                maxPolarAngle={Math.PI / 2}
+              />
             </Canvas>
 
             {hovered && hovered.id !== selectedId ? (
@@ -270,41 +465,14 @@ export default function CaseTimeline3D({
               )}
 
               {onSelectEventId ? null : (
-                <div className="text-xs text-white/50">
-                  Tip: switch to list view to edit/delete.
-                </div>
+                <div className="text-xs text-white/50">Tip: switch to list view to edit/delete.</div>
               )}
             </div>
           ) : (
-            <div className="mt-2 text-sm text-white/50">Click an event node.</div>
+            <div className="mt-2 text-sm text-white/50">Click an event node or use arrow keys.</div>
           )}
-
-          <div className="mt-4 text-xs text-white/60">Lanes</div>
-          <div className="mt-2 space-y-1 text-xs text-white/70">
-            <div className="flex items-center justify-between">
-              <span>deadline</span>
-              <span className="opacity-70">y=1.6</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span>hearing</span>
-              <span className="opacity-70">y=0.8</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span>filing</span>
-              <span className="opacity-70">y=0</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span>evidence</span>
-              <span className="opacity-70">y=-0.8</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span>note</span>
-              <span className="opacity-70">y=-1.6</span>
-            </div>
-          </div>
         </aside>
       </div>
     </section>
   );
 }
-

@@ -6,6 +6,7 @@ import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
 import { DRAFT_TEMPLATES, templateDoc } from "@/lib/draftTemplates";
+import { analyzeFilingReadiness, mergeFilingSettings, type FilingIssue, type FilingSettings } from "@/lib/draft-filing-checks";
 
 type Draft = {
   id: string;
@@ -22,6 +23,10 @@ type Draft = {
   signature_name?: string | null;
   signature_title?: string | null;
 };
+
+type Party = { id: string; role: string; name: string; notes?: string | null };
+type Exhibit = { id: string; label: string; sequence: number; title: string };
+type PinnedAuthority = { id: string; citation: string; title?: string; url?: string };
 
 async function jsonFetch(url: string, init?: RequestInit) {
   const res = await fetch(url, {
@@ -76,6 +81,14 @@ export default function DraftsEditor({
   const [signatureTitle, setSignatureTitle] = React.useState<string>("");
   const [sigUploading, setSigUploading] = React.useState(false);
 
+  const [intake, setIntake] = React.useState<any>({});
+  const [parties, setParties] = React.useState<Party[]>([]);
+  const [exhibits, setExhibits] = React.useState<Exhibit[]>([]);
+  const [pinned, setPinned] = React.useState<PinnedAuthority[]>([]);
+
+  const [filing, setFiling] = React.useState<FilingSettings>({});
+  const [readiness, setReadiness] = React.useState<{ issues: FilingIssue[]; ignored: string[] }>({ issues: [], ignored: [] });
+
   const [loading, setLoading] = React.useState(true);
   const [saving, setSaving] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
@@ -87,12 +100,35 @@ export default function DraftsEditor({
   const initialDocRef = React.useRef<any>({ type: "doc", content: [{ type: "paragraph" }] });
   const suppressUpdateRef = React.useRef(false);
 
+  function computeReadiness(nextFiling?: FilingSettings) {
+    const rich = editor?.getJSON?.() ?? loadedDoc ?? null;
+    const plain = editor?.getText?.({ blockSeparator: "\n\n" }) ?? draft?.content ?? "";
+    const r = analyzeFilingReadiness({
+      draftTitle: title.trim() || draft?.title || "Draft",
+      rich,
+      plain,
+      intake,
+      parties,
+      exhibits,
+      pinned,
+      filing: nextFiling ?? filing,
+    });
+    setReadiness(r);
+  }
+
   const load = React.useCallback(async () => {
     setError(null);
     setOk(null);
     setLoading(true);
     try {
-      const j = await jsonFetch(`/api/cases/${caseId}/drafts/${draftId}`, { method: "GET" });
+      const [j, i, p, ex, pin] = await Promise.all([
+        jsonFetch(`/api/cases/${caseId}/drafts/${draftId}`, { method: "GET" }),
+        jsonFetch(`/api/cases/${caseId}/intake`, { method: "GET" }).catch(() => ({ item: {} })),
+        jsonFetch(`/api/cases/${caseId}/parties`, { method: "GET" }).catch(() => ({ items: [] })),
+        jsonFetch(`/api/cases/${caseId}/exhibits`, { method: "GET" }).catch(() => ({ items: [] })),
+        jsonFetch(`/api/cases/${caseId}/research/pin`, { method: "GET" }).catch(() => ({ items: [] })),
+      ]);
+
       const d: Draft = j.item;
       setDraft(d);
       setTitle(d.title ?? "");
@@ -106,6 +142,14 @@ export default function DraftsEditor({
       const nextDoc = rich ?? textToDoc(d.content ?? "");
       initialDocRef.current = nextDoc;
       setLoadedDoc(nextDoc);
+      const intakeObj = (i as any)?.item?.intake ?? (i as any)?.item ?? {};
+      setIntake(intakeObj ?? {});
+      setParties(((p as any)?.items ?? []) as Party[]);
+      setExhibits(((ex as any)?.items ?? []) as Exhibit[]);
+      setPinned(((pin as any)?.items ?? []) as PinnedAuthority[]);
+
+      const nextFiling = (rich?.attrs?.filing && typeof rich.attrs.filing === "object" ? rich.attrs.filing : {}) as FilingSettings;
+      setFiling(nextFiling);
       setDirty(false);
     } catch (e: any) {
       setError(e?.message ?? "Failed");
@@ -145,6 +189,12 @@ export default function DraftsEditor({
   }, [load]);
 
   React.useEffect(() => {
+    if (loading) return;
+    computeReadiness();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, draftId]);
+
+  React.useEffect(() => {
     if (!editor) return;
     if (!loadedDoc) return;
     // Replace content without setting history/dirty.
@@ -159,6 +209,9 @@ export default function DraftsEditor({
     setSaving(true);
     try {
       const rich = editor?.getJSON?.() ?? null;
+      if (rich && typeof rich === "object") {
+        rich.attrs = { ...(rich.attrs ?? {}), filing };
+      }
       const plain = editor?.getText?.({ blockSeparator: "\n\n" }) ?? "";
       const j = await jsonFetch(`/api/cases/${caseId}/drafts/${draftId}`, {
         method: "PATCH",
@@ -451,6 +504,421 @@ export default function DraftsEditor({
                 {signatureBucket}/{signaturePath}
               </div>
             ) : null}
+          </div>
+
+          <div className="rounded-xl border border-white/10 bg-black/10 p-3">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="text-sm font-medium text-white">Filing readiness</div>
+                <div className="text-xs text-white/60">
+                  Bluebook-style citation linting (warnings only) and checks for missing filing elements. You can ignore any warning.
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => computeReadiness()}
+                className="rounded-md border border-white/10 bg-black/20 px-2 py-1 text-xs text-white/70 hover:bg-black/30"
+              >
+                Refresh checks
+              </button>
+            </div>
+
+            <div className="mt-3 flex flex-wrap gap-2 text-xs">
+              <span className="rounded-full border border-red-400/30 bg-red-500/10 px-2 py-1 text-red-100">
+                Errors: {readiness.issues.filter((x) => x.severity === "error").length}
+              </span>
+              <span className="rounded-full border border-amber-300/30 bg-amber-300/10 px-2 py-1 text-amber-50">
+                Warnings: {readiness.issues.filter((x) => x.severity === "warning").length}
+              </span>
+              {readiness.ignored.length ? (
+                <span className="rounded-full border border-white/10 bg-black/20 px-2 py-1 text-white/70">
+                  Ignored: {readiness.ignored.length}
+                </span>
+              ) : null}
+            </div>
+
+            {readiness.issues.length ? (
+              <ul className="mt-3 space-y-2">
+                {readiness.issues.slice(0, 20).map((iss) => (
+                  <li key={iss.id} className="rounded-lg border border-white/10 bg-black/20 p-2">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="text-xs font-medium text-white">
+                          {iss.severity === "error" ? "ERROR" : "WARNING"}: {iss.title}
+                        </div>
+                        {iss.detail ? <div className="mt-1 text-xs text-white/70">{iss.detail}</div> : null}
+                        {iss.hint ? <div className="mt-1 text-[11px] text-white/50">Hint: {iss.hint}</div> : null}
+                      </div>
+                      {iss.severity === "warning" ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const next = mergeFilingSettings(filing, {
+                              ignoredIssueIds: Array.from(new Set([...(filing.ignoredIssueIds ?? []), iss.id])),
+                            });
+                            setFiling(next);
+                            computeReadiness(next);
+                            setDirty(true);
+                          }}
+                          className="shrink-0 rounded-md border border-white/10 bg-black/30 px-2 py-1 text-[11px] text-white/70 hover:bg-black/40"
+                        >
+                          Ignore
+                        </button>
+                      ) : null}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <div className="mt-3 text-sm text-white/70">No issues found.</div>
+            )}
+
+            <div className="mt-3 text-[11px] text-white/45">
+              Court rules vary by jurisdiction. Review your filing before submission.
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-white/10 bg-black/10 p-3">
+            <div className="text-sm font-medium text-white">Export blocks</div>
+            <div className="mt-1 text-xs text-white/60">Per-draft toggles for certificate of service, notary, and proposed order signature area.</div>
+
+            {/* Certificate of service */}
+            <div className="mt-3 rounded-lg border border-white/10 bg-black/20 p-3">
+              <label className="flex items-center gap-2 text-sm text-white/80">
+                <input
+                  type="checkbox"
+                  checked={!!filing.service?.enabled}
+                  onChange={(e) => {
+                    const next = mergeFilingSettings(filing, { service: { enabled: e.target.checked } });
+                    setFiling(next);
+                    computeReadiness(next);
+                    setDirty(true);
+                  }}
+                />
+                Include certificate of service
+              </label>
+              {filing.service?.enabled ? (
+                <div className="mt-3 grid gap-3 lg:grid-cols-3">
+                  <div className="space-y-1">
+                    <label className="text-xs text-white/70">Date of service</label>
+                    <input
+                      value={filing.service?.date ?? ""}
+                      onChange={(e) => {
+                        const next = mergeFilingSettings(filing, { service: { date: e.target.value } });
+                        setFiling(next);
+                        computeReadiness(next);
+                        setDirty(true);
+                      }}
+                      placeholder="e.g., February 10, 2026"
+                      className="w-full rounded-md border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder:text-white/40"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs text-white/70">Default method</label>
+                    <select
+                      value={filing.service?.methodDefault ?? ""}
+                      onChange={(e) => {
+                        const v = (e.target.value || undefined) as any;
+                        const next = mergeFilingSettings(filing, { service: { methodDefault: v } });
+                        setFiling(next);
+                        computeReadiness(next);
+                        setDirty(true);
+                      }}
+                      className="w-full rounded-md border border-white/10 bg-black/30 px-3 py-2 text-sm text-white"
+                    >
+                      <option value="">(select)</option>
+                      <option value="certified_mail">Certified mail</option>
+                      <option value="email">Email</option>
+                      <option value="efile_provider">E-filing provider service</option>
+                      <option value="process_server">Process server</option>
+                      <option value="publication">Publication</option>
+                      <option value="other">Other</option>
+                    </select>
+                  </div>
+                  <div className="space-y-1 lg:col-span-3">
+                    <label className="text-xs text-white/70">Method details (optional)</label>
+                    <input
+                      value={filing.service?.methodDetails ?? ""}
+                      onChange={(e) => {
+                        const next = mergeFilingSettings(filing, { service: { methodDetails: e.target.value } });
+                        setFiling(next);
+                        computeReadiness(next);
+                        setDirty(true);
+                      }}
+                      placeholder="Tracking number, provider name, email address used, process server details, etc."
+                      className="w-full rounded-md border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder:text-white/40"
+                    />
+                  </div>
+                  <div className="space-y-1 lg:col-span-3">
+                    <label className="text-xs text-white/70">Recipients</label>
+                    <div className="space-y-2">
+                      {(filing.service?.recipients ?? []).map((r, idx) => (
+                        <div key={idx} className="grid gap-2 lg:grid-cols-12">
+                          <input
+                            value={r.name}
+                            onChange={(e) => {
+                              const nextRecipients = [...(filing.service?.recipients ?? [])];
+                              nextRecipients[idx] = { ...nextRecipients[idx], name: e.target.value };
+                              const next = mergeFilingSettings(filing, { service: { recipients: nextRecipients } });
+                              setFiling(next);
+                              computeReadiness(next);
+                              setDirty(true);
+                            }}
+                            placeholder="Recipient name"
+                            className="lg:col-span-4 w-full rounded-md border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder:text-white/40"
+                          />
+                          <input
+                            value={r.addressOrEmail ?? ""}
+                            onChange={(e) => {
+                              const nextRecipients = [...(filing.service?.recipients ?? [])];
+                              nextRecipients[idx] = { ...nextRecipients[idx], addressOrEmail: e.target.value };
+                              const next = mergeFilingSettings(filing, { service: { recipients: nextRecipients } });
+                              setFiling(next);
+                              computeReadiness(next);
+                              setDirty(true);
+                            }}
+                            placeholder="Address or email"
+                            className="lg:col-span-4 w-full rounded-md border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder:text-white/40"
+                          />
+                          <select
+                            value={r.method ?? ""}
+                            onChange={(e) => {
+                              const v = (e.target.value || undefined) as any;
+                              const nextRecipients = [...(filing.service?.recipients ?? [])];
+                              nextRecipients[idx] = { ...nextRecipients[idx], method: v };
+                              const next = mergeFilingSettings(filing, { service: { recipients: nextRecipients } });
+                              setFiling(next);
+                              computeReadiness(next);
+                              setDirty(true);
+                            }}
+                            className="lg:col-span-3 w-full rounded-md border border-white/10 bg-black/30 px-3 py-2 text-sm text-white"
+                          >
+                            <option value="">(method)</option>
+                            <option value="certified_mail">Certified mail</option>
+                            <option value="email">Email</option>
+                            <option value="efile_provider">E-filing provider</option>
+                            <option value="process_server">Process server</option>
+                            <option value="publication">Publication</option>
+                            <option value="other">Other</option>
+                          </select>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const nextRecipients = [...(filing.service?.recipients ?? [])];
+                              nextRecipients.splice(idx, 1);
+                              const next = mergeFilingSettings(filing, { service: { recipients: nextRecipients } });
+                              setFiling(next);
+                              computeReadiness(next);
+                              setDirty(true);
+                            }}
+                            className="lg:col-span-1 rounded-md border border-white/10 bg-black/30 px-2 py-2 text-xs text-white/70 hover:bg-black/40"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      ))}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const nextRecipients = [...(filing.service?.recipients ?? []), { name: "" }];
+                          const next = mergeFilingSettings(filing, { service: { recipients: nextRecipients } });
+                          setFiling(next);
+                          computeReadiness(next);
+                          setDirty(true);
+                        }}
+                        className="rounded-md border border-white/10 bg-black/30 px-3 py-2 text-xs text-white/70 hover:bg-black/40"
+                      >
+                        Add recipient
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+            </div>
+
+            {/* Notary */}
+            <div className="mt-3 rounded-lg border border-white/10 bg-black/20 p-3">
+              <label className="flex items-center gap-2 text-sm text-white/80">
+                <input
+                  type="checkbox"
+                  checked={!!filing.notary?.enabled}
+                  onChange={(e) => {
+                    const next = mergeFilingSettings(filing, { notary: { enabled: e.target.checked } });
+                    setFiling(next);
+                    computeReadiness(next);
+                    setDirty(true);
+                  }}
+                />
+                Include notary block
+              </label>
+              {filing.notary?.enabled ? (
+                <div className="mt-3 grid gap-3 lg:grid-cols-3">
+                  <div className="space-y-1">
+                    <label className="text-xs text-white/70">Type</label>
+                    <select
+                      value={filing.notary?.type ?? ""}
+                      onChange={(e) => {
+                        const v = (e.target.value || undefined) as any;
+                        const next = mergeFilingSettings(filing, { notary: { type: v } });
+                        setFiling(next);
+                        computeReadiness(next);
+                        setDirty(true);
+                      }}
+                      className="w-full rounded-md border border-white/10 bg-black/30 px-3 py-2 text-sm text-white"
+                    >
+                      <option value="">(select)</option>
+                      <option value="jurat">Jurat</option>
+                      <option value="acknowledgment">Acknowledgment</option>
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs text-white/70">State</label>
+                    <input
+                      value={filing.notary?.state ?? ""}
+                      onChange={(e) => {
+                        const next = mergeFilingSettings(filing, { notary: { state: e.target.value } });
+                        setFiling(next);
+                        computeReadiness(next);
+                        setDirty(true);
+                      }}
+                      className="w-full rounded-md border border-white/10 bg-black/30 px-3 py-2 text-sm text-white"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs text-white/70">County</label>
+                    <input
+                      value={filing.notary?.county ?? ""}
+                      onChange={(e) => {
+                        const next = mergeFilingSettings(filing, { notary: { county: e.target.value } });
+                        setFiling(next);
+                        computeReadiness(next);
+                        setDirty(true);
+                      }}
+                      className="w-full rounded-md border border-white/10 bg-black/30 px-3 py-2 text-sm text-white"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs text-white/70">Date</label>
+                    <input
+                      value={filing.notary?.date ?? ""}
+                      onChange={(e) => {
+                        const next = mergeFilingSettings(filing, { notary: { date: e.target.value } });
+                        setFiling(next);
+                        computeReadiness(next);
+                        setDirty(true);
+                      }}
+                      placeholder="(optional)"
+                      className="w-full rounded-md border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder:text-white/40"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs text-white/70">Notary name</label>
+                    <input
+                      value={filing.notary?.notaryName ?? ""}
+                      onChange={(e) => {
+                        const next = mergeFilingSettings(filing, { notary: { notaryName: e.target.value } });
+                        setFiling(next);
+                        computeReadiness(next);
+                        setDirty(true);
+                      }}
+                      placeholder="(optional)"
+                      className="w-full rounded-md border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder:text-white/40"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs text-white/70">Commission expires</label>
+                    <input
+                      value={filing.notary?.commissionExpires ?? ""}
+                      onChange={(e) => {
+                        const next = mergeFilingSettings(filing, { notary: { commissionExpires: e.target.value } });
+                        setFiling(next);
+                        computeReadiness(next);
+                        setDirty(true);
+                      }}
+                      placeholder="(optional)"
+                      className="w-full rounded-md border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder:text-white/40"
+                    />
+                  </div>
+                </div>
+              ) : null}
+            </div>
+
+            {/* Proposed order */}
+            <div className="mt-3 rounded-lg border border-white/10 bg-black/20 p-3">
+              <label className="flex items-center gap-2 text-sm text-white/80">
+                <input
+                  type="checkbox"
+                  checked={!!filing.proposedOrder?.enabled}
+                  onChange={(e) => {
+                    const next = mergeFilingSettings(filing, { proposedOrder: { enabled: e.target.checked } });
+                    setFiling(next);
+                    computeReadiness(next);
+                    setDirty(true);
+                  }}
+                />
+                Include proposed order (judge signature area)
+              </label>
+              {filing.proposedOrder?.enabled ? (
+                <div className="mt-3 grid gap-3 lg:grid-cols-3">
+                  <div className="space-y-1 lg:col-span-3">
+                    <label className="text-xs text-white/70">Order title</label>
+                    <input
+                      value={filing.proposedOrder?.title ?? ""}
+                      onChange={(e) => {
+                        const next = mergeFilingSettings(filing, { proposedOrder: { title: e.target.value } });
+                        setFiling(next);
+                        computeReadiness(next);
+                        setDirty(true);
+                      }}
+                      placeholder='e.g., "Proposed Order Granting Motion to …"'
+                      className="w-full rounded-md border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder:text-white/40"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs text-white/70">Judge name</label>
+                    <input
+                      value={filing.proposedOrder?.judgeName ?? ""}
+                      onChange={(e) => {
+                        const next = mergeFilingSettings(filing, { proposedOrder: { judgeName: e.target.value } });
+                        setFiling(next);
+                        computeReadiness(next);
+                        setDirty(true);
+                      }}
+                      placeholder="(optional)"
+                      className="w-full rounded-md border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder:text-white/40"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs text-white/70">Judge title</label>
+                    <input
+                      value={filing.proposedOrder?.judgeTitle ?? ""}
+                      onChange={(e) => {
+                        const next = mergeFilingSettings(filing, { proposedOrder: { judgeTitle: e.target.value } });
+                        setFiling(next);
+                        computeReadiness(next);
+                        setDirty(true);
+                      }}
+                      placeholder="e.g., District Judge"
+                      className="w-full rounded-md border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder:text-white/40"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs text-white/70">Date line</label>
+                    <input
+                      value={filing.proposedOrder?.date ?? ""}
+                      onChange={(e) => {
+                        const next = mergeFilingSettings(filing, { proposedOrder: { date: e.target.value } });
+                        setFiling(next);
+                        computeReadiness(next);
+                        setDirty(true);
+                      }}
+                      placeholder="(optional)"
+                      className="w-full rounded-md border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder:text-white/40"
+                    />
+                  </div>
+                </div>
+              ) : null}
+            </div>
           </div>
 
           <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-white/55">

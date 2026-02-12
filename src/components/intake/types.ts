@@ -30,10 +30,15 @@ export type EvidenceItem = {
 export type IntakeData = {
   basics?: {
     title?: string;
+    plaintiffName?: string;
+    defendantName?: string;
     description?: string;
     court?: string;
     jurisdiction?: string;
     caseNumber?: string;
+    caseType?: string;
+    caseNumberStatus?: string; // filed-pending | not-filed | has-number | original-petition
+    juryTrial?: string; // jury | non-jury | unknown
   };
 
   parties?: IntakeParty[];
@@ -70,3 +75,22 @@ export const emptyIntakeData = (): IntakeData => ({
   evidence: [],
   meta: { version: 1 },
 });
+
+/** Returns true if the intake has meaningful saved data (avoids re-running full questionnaire) */
+export function hasExistingIntake(data: IntakeData): boolean {
+  if (!data) return false;
+  const b = data.basics ?? {};
+  if ((b.title ?? "").trim()) return true;
+  if ((b.description ?? "").trim()) return true;
+  if ((b.court ?? "").trim()) return true;
+  if ((b.jurisdiction ?? "").trim()) return true;
+  if ((data.parties ?? []).length > 0) return true;
+  if ((data.claims ?? []).length > 0) return true;
+  if ((data.defenses ?? []).length > 0) return true;
+  const f = data.facts ?? {};
+  if ((f.narrative ?? "").trim()) return true;
+  const d = data.damages ?? {};
+  if ((d.items ?? []).length > 0 || (d.narrative ?? "").trim()) return true;
+  if ((data.evidence ?? []).length > 0) return true;
+  return false;
+}

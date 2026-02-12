@@ -1,6 +1,7 @@
 import React from "react";
 import AppHeader from "@/components/layout/AppHeader";
 import BackgroundFX from "@/components/marketing/BackgroundFX";
+import ContentFadeIn from "@/components/ui/ContentFadeIn";
 
 export default function Template({
   title,
@@ -27,7 +28,9 @@ export default function Template({
           {actions ? <div className="shrink-0">{actions}</div> : null}
         </div>
 
-        <div className="mt-6">{children}</div>
+        <ContentFadeIn>
+          <div className="mt-6">{children}</div>
+        </ContentFadeIn>
       </main>
     </div>
   );

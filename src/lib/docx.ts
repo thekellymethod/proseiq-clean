@@ -97,12 +97,14 @@ function wSignatureImage(rId: string) {
 }
 
 export function buildDocx(opts: {
+  frontMatter?: string;
   title: string;
   meta?: string;
   body: string;
   courtStyle?: boolean;
   signaturePng?: Uint8Array | null;
 }): Uint8Array {
+  const frontMatter = opts.frontMatter || "";
   const title = opts.title || "Draft";
   const meta = opts.meta || "";
   const courtStyle = Boolean(opts.courtStyle);
@@ -110,10 +112,14 @@ export function buildDocx(opts: {
   const hasSig = Boolean(opts.signaturePng && opts.signaturePng.length > 0);
   const sigRelId = hasSig ? "rId2" : "";
 
+  const fmParas = frontMatter ? toParagraphs(frontMatter) : [];
+
   const documentXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
   xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
   <w:body>
+    ${fmParas.length ? fmParas.map((x) => wP(x, { courtStyle })).join("\n") : ""}
+    ${fmParas.length ? wP("", { courtStyle }) : ""}
     ${wP(title, { courtStyle })}
     ${meta ? wP(meta, { courtStyle }) : ""}
     ${wP("", { courtStyle })}
