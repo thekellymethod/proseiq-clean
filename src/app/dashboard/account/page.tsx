@@ -3,15 +3,23 @@ import { getUserOrRedirect } from "@/lib/auth/getAuth";
 import AccountClient from "@/components/account/AccountClient";
 
 export default async function AccountPage() {
-  const { user } = await getUserOrRedirect();
+  const { user, supabase } = await getUserOrRedirect();
 
   const hasOpenAI = Boolean(process.env.OPENAI_API_KEY);
   const hasSerper = Boolean(process.env.SERPER_API_KEY);
 
+  const { data: sub } = await supabase
+    .from("billing_subscriptions")
+    .select("status, current_period_end, cancel_at_period_end, price_id, stripe_subscription_id")
+    .eq("user_id", user.id)
+    .order("updated_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
   return (
     <Template
       title="Account"
-      subtitle="Profile, safety settings, and configuration status."
+      subtitle="Profile, safety settings, configuration, and billing."
     >
       <AccountClient
         user={{
@@ -24,6 +32,11 @@ export default async function AccountPage() {
           openaiConfigured: hasOpenAI,
           serperConfigured: hasSerper,
           model: process.env.OPENAI_MODEL ?? null,
+        }}
+        billing={{
+          status: sub?.status ?? null,
+          current_period_end: sub?.current_period_end ?? null,
+          cancel_at_period_end: sub?.cancel_at_period_end ?? null,
         }}
       />
     </Template>

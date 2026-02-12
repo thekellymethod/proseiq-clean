@@ -17,6 +17,12 @@ type ConfigStatus = {
   model: string | null;
 };
 
+type BillingStatus = {
+  status: string | null;
+  current_period_end: string | null;
+  cancel_at_period_end: boolean | null;
+};
+
 function cx(...s: Array<string | false | null | undefined>) {
   return s.filter(Boolean).join(" ");
 }
@@ -33,9 +39,11 @@ function fmt(iso?: string | null) {
 export default function AccountClient({
   user,
   config,
+  billing,
 }: {
   user: UserLike;
   config: ConfigStatus;
+  billing: BillingStatus;
 }) {
   const router = useRouter();
   const [busy, setBusy] = React.useState(false);
@@ -70,6 +78,38 @@ export default function AccountClient({
     } finally {
       setBusy(false);
       window.setTimeout(() => setOk(null), 1400);
+    }
+  }
+
+  async function startCheckout(interval: "monthly" | "annual" = "monthly") {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/billing/checkout", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ interval }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.error ?? "Checkout failed");
+      if (json?.url) window.location.href = json.url;
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Checkout failed");
+      setBusy(false);
+    }
+  }
+
+  async function openPortal() {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/billing/portal", { method: "POST" });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.error ?? "Portal failed");
+      if (json?.url) window.location.href = json.url;
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Portal failed");
+      setBusy(false);
     }
   }
 
@@ -215,6 +255,51 @@ export default function AccountClient({
           </div>
           <div className="mt-2 text-xs text-white/50">
             Keys are never shown in the UI.
+          </div>
+        </div>
+
+        <div className="mt-6 rounded-xl border border-white/10 bg-black/10 p-4">
+          <div className="text-sm font-medium text-white">Billing</div>
+          <div className="mt-2 grid gap-2 sm:grid-cols-3 text-sm">
+            <div className="rounded-lg border border-white/10 bg-black/20 p-3">
+              <div className="text-xs text-white/60">Status</div>
+              <div className="mt-1 font-medium text-white/80">{billing.status ?? "free"}</div>
+            </div>
+            <div className="rounded-lg border border-white/10 bg-black/20 p-3">
+              <div className="text-xs text-white/60">Renews / ends</div>
+              <div className="mt-1 font-medium text-white/80">{fmt(billing.current_period_end)}</div>
+            </div>
+            <div className="rounded-lg border border-white/10 bg-black/20 p-3">
+              <div className="text-xs text-white/60">Cancel at period end</div>
+              <div className="mt-1 font-medium text-white/80">{billing.cancel_at_period_end ? "Yes" : "No"}</div>
+            </div>
+          </div>
+          <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+            <button
+              onClick={() => startCheckout("monthly")}
+              disabled={busy}
+              className={cx(
+                "w-full rounded-md border px-3 py-2 text-sm font-medium",
+                "border-emerald-300/30 bg-emerald-300/12 text-emerald-100 hover:bg-emerald-300/20",
+                busy && "opacity-60"
+              )}
+            >
+              Upgrade (Monthly)
+            </button>
+            <button
+              onClick={openPortal}
+              disabled={busy}
+              className={cx(
+                "w-full rounded-md border px-3 py-2 text-sm font-medium",
+                "border-white/10 bg-black/20 text-white/80 hover:bg-black/30",
+                busy && "opacity-60"
+              )}
+            >
+              Manage billing
+            </button>
+          </div>
+          <div className="mt-2 text-xs text-white/50">
+            Billing updates after Stripe webhooks are received.
           </div>
         </div>
       </section>
