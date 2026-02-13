@@ -88,7 +88,7 @@ export default async function CaseAnalysisPanel({ caseId }: { caseId: string }) 
 
   const pinnedItems = (pinnedResearch.data ?? []).map((r: any) => {
     const c = r.content ?? {};
-    return { citation: c.citation, title: c.title, summary: c.summary, relevance: c.relevance };
+    return { citation: c.citation, title: c.title, summary: c.summary, relevance: c.whyRelevant ?? c.relevance };
   });
 
   const intake = (intakeRow.data as any)?.intake ?? {};

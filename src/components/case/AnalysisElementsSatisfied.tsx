@@ -33,12 +33,15 @@ export default function AnalysisElementsSatisfied({
 
   const satisfied = items.filter((x) => x.satisfied).length;
   const total = items.length;
+  const isFallback = !elementsSatisfied?.length && (elementsChecklist ?? []).length > 0;
 
   return (
     <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
       <h4 className="text-white font-medium">Elements satisfied</h4>
       <p className="mt-1 text-sm text-white/70">
-        Discernment of which elements are satisfied vs. missing based on available evidence.
+        {isFallback
+          ? "Items to prove / evidence gaps. Run analysis again for full discernment of satisfied vs. missing elements."
+          : "Discernment of which elements are satisfied vs. missing based on available evidence."}
       </p>
       <div className="mt-3 flex items-center gap-2 text-sm">
         <span className="text-emerald-300/90">{satisfied} satisfied</span>

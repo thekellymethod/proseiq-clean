@@ -52,7 +52,7 @@ export default function AnalysisStatuteOfLimitations({
     <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
       <h4 className="text-white font-medium">Statute of limitations</h4>
       <p className="mt-1 text-sm text-white/70">
-        Time limits vary by claim type and jurisdiction. Verify with primary sources and local rules.
+        Typical ranges by claim type and jurisdiction. Confirm with primary sources and local rules.
       </p>
 
       <div className="mt-4 space-y-3">
@@ -83,7 +83,7 @@ export default function AnalysisStatuteOfLimitations({
         ) : null}
 
         <p className="text-xs text-white/50">
-          Discovery rule, tolling, and equitable estoppel may change accrual. Consult an attorney for your case.
+          Values are typical ranges only. Discovery rule, tolling, and equitable estoppel may change accrual. Confirm with primary sources and an attorney for your case.
         </p>
       </div>
 

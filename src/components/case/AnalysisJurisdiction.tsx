@@ -23,7 +23,7 @@ export default function AnalysisJurisdiction({
     <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
       <h4 className="text-white font-medium">Jurisdiction (all 50 states)</h4>
       <p className="mt-1 text-sm text-white/70">
-        Reference for jurisdiction-specific rules. Your primary jurisdiction is highlighted.
+        Reference for jurisdiction-specific rules. Your primary jurisdiction is highlighted. SOL values are typical ranges—confirm with primary sources.
       </p>
 
       <div className="mt-4 max-h-64 overflow-y-auto rounded-xl border border-white/10 bg-black/10 p-3">
