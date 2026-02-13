@@ -1,26 +1,17 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/utils/supabase/server";
-
-async function requireUser() {
-  const supabase = await createClient();
-  const { data: auth } = await supabase.auth.getUser();
-  if (!auth?.user) return { supabase, user: null, res: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
-  return { supabase, user: auth.user, res: null as any };
-}
-
-function bad(message: string, status = 400) {
-  return NextResponse.json({ error: message }, { status });
-}
+import { requireCaseAccess, guardAuth } from "@/lib/api/auth";
+import { badRequest } from "@/lib/api/errors";
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { supabase, user, res } = await requireUser();
-  if (!user) return res;
-
   const { id } = await params;
+  const result = await requireCaseAccess(id);
+  if (guardAuth(result)) return result.res;
+
+  const { supabase } = result;
   const body = await req.json().catch(() => ({}));
   const status = String(body?.status ?? "").trim();
-  if (!status) return bad("status required", 400);
-  if (!["active", "archived"].includes(status)) return bad("status must be active|archived", 400);
+  if (!status) return badRequest("status required");
+  if (!["active", "archived"].includes(status)) return badRequest("status must be active|archived");
 
   const { data, error } = await supabase
     .from("cases")
@@ -29,6 +20,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     .select("id,status,updated_at")
     .single();
 
-  if (error) return bad(error.message, 400);
+  if (error) return badRequest(error.message);
   return NextResponse.json({ item: data });
 }

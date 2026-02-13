@@ -1,25 +1,16 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/utils/supabase/server";
-
-async function requireUser() {
-  const supabase = await createClient();
-  const { data: auth } = await supabase.auth.getUser();
-  if (!auth?.user) return { supabase, user: null, res: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
-  return { supabase, user: auth.user, res: null as any };
-}
-
-function bad(message: string, status = 400) {
-  return NextResponse.json({ error: message }, { status });
-}
+import { requireCaseAccess, guardAuth } from "@/lib/api/auth";
+import { badRequest } from "@/lib/api/errors";
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { supabase, user, res } = await requireUser();
-  if (!user) return res;
-
   const { id } = await params;
+  const result = await requireCaseAccess(id);
+  if (guardAuth(result)) return result.res;
+
+  const { supabase } = result;
   const body = await req.json().catch(() => ({}));
   const order: string[] = Array.isArray(body?.order) ? body.order : [];
-  if (!order.length) return bad("order[] required", 400);
+  if (!order.length) return badRequest("order[] required");
 
   const results = await Promise.all(
     order.map((exhibitId, i) =>
@@ -32,7 +23,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   );
 
   const firstErr = results.map((r: any) => r.error).find(Boolean);
-  if (firstErr) return bad(firstErr.message, 400);
+  if (firstErr) return badRequest(firstErr.message);
 
   return NextResponse.json({ ok: true });
 }

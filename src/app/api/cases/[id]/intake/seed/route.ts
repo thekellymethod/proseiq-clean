@@ -1,16 +1,6 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/utils/supabase/server";
-
-async function requireUser() {
-  const supabase = await createClient();
-  const { data: auth } = await supabase.auth.getUser();
-  if (!auth?.user) return { supabase, user: null, res: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
-  return { supabase, user: auth.user, res: null as any };
-}
-
-function bad(message: string, status = 400) {
-  return NextResponse.json({ error: message }, { status });
-}
+import { requireCaseAccess, guardAuth } from "@/lib/api/auth";
+import { badRequest } from "@/lib/api/errors";
 
 function lines(text: any): string[] {
   return String(text ?? "")
@@ -20,10 +10,11 @@ function lines(text: any): string[] {
 }
 
 export async function POST(_: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { supabase, user, res } = await requireUser();
-  if (!user) return res;
-
   const { id } = await params;
+  const result = await requireCaseAccess(id);
+  if (guardAuth(result)) return result.res;
+
+  const { supabase } = result;
   const { data: intakeRow } = await supabase
     .from("case_intakes")
     .select("intake")
@@ -48,7 +39,7 @@ export async function POST(_: Request, { params }: { params: Promise<{ id: strin
       { case_id: id, event_at: plusDays(14), kind: "filing", title: "Draft first filing / response", notes: "Start with caption, jurisdictional allegations, and core elements." },
     ];
     const { error } = await supabase.from("case_events").insert(seedEvents);
-    if (error) return bad(error.message, 400);
+    if (error) return badRequest(error.message);
   }
 
   const { data: existingExhibits, error: exhibitsErr } = await supabase

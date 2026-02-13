@@ -1,22 +1,13 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/utils/supabase/server";
-
-async function requireUser() {
-  const supabase = await createClient();
-  const { data: auth } = await supabase.auth.getUser();
-  if (!auth?.user) return { supabase, user: null, res: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
-  return { supabase, user: auth.user, res: null as any };
-}
-
-function bad(message: string, status = 400) {
-  return NextResponse.json({ error: message }, { status });
-}
+import { requireCaseAccess, guardAuth } from "@/lib/api/auth";
+import { badRequest } from "@/lib/api/errors";
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { supabase, user, res } = await requireUser();
-  if (!user) return res;
-
   const { id } = await params;
+  const result = await requireCaseAccess(id);
+  if (guardAuth(result)) return result.res;
+
+  const { supabase } = result;
   const url = new URL(req.url);
   const limit = Math.min(Math.max(Number(url.searchParams.get("limit") ?? 200), 1), 1000);
   const status = String(url.searchParams.get("status") ?? "").trim();
@@ -32,18 +23,19 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   if (status) query = query.eq("status", status);
 
   const { data, error } = await query;
-  if (error) return bad(error.message, 400);
+  if (error) return badRequest(error.message);
   return NextResponse.json({ items: data ?? [] });
 }
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { supabase, user, res } = await requireUser();
-  if (!user) return res;
-
   const { id } = await params;
+  const result = await requireCaseAccess(id);
+  if (guardAuth(result)) return result.res;
+
+  const { supabase, user } = result;
   const body = await req.json().catch(() => ({}));
   const title = String(body?.title ?? "").trim();
-  if (!title) return bad("title required", 400);
+  if (!title) return badRequest("title required");
 
   const payload: any = {
     case_id: id,
@@ -62,26 +54,27 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     .select("id,case_id,created_at,updated_at,due_at,kind,status,title,notes")
     .single();
 
-  if (error) return bad(error.message, 400);
+  if (error) return badRequest(error.message);
   return NextResponse.json({ item: data });
 }
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { supabase, user, res } = await requireUser();
-  if (!user) return res;
-
   const { id } = await params;
+  const result = await requireCaseAccess(id);
+  if (guardAuth(result)) return result.res;
+
+  const { supabase } = result;
   const body = await req.json().catch(() => ({}));
   const taskId = String(body?.task_id ?? body?.id ?? "").trim();
   const incoming = body?.patch && typeof body.patch === "object" ? body.patch : body;
-  if (!taskId) return bad("task_id required", 400);
+  if (!taskId) return badRequest("task_id required");
 
   const patch: any = {};
   for (const k of ["title", "kind", "status", "notes", "due_at"]) if (k in incoming) patch[k] = (incoming as any)[k];
   if ("title" in patch) patch.title = String(patch.title ?? "").trim();
   patch.updated_at = new Date().toISOString();
 
-  if (Object.keys(patch).length === 0) return bad("No fields to update", 400);
+  if (Object.keys(patch).length === 0) return badRequest("No fields to update");
 
   const { data, error } = await supabase
     .from("case_tasks")
@@ -91,21 +84,22 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     .select("id,case_id,created_at,updated_at,due_at,kind,status,title,notes")
     .single();
 
-  if (error) return bad(error.message, 400);
+  if (error) return badRequest(error.message);
   return NextResponse.json({ item: data });
 }
 
 export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { supabase, user, res } = await requireUser();
-  if (!user) return res;
-
   const { id } = await params;
+  const result = await requireCaseAccess(id);
+  if (guardAuth(result)) return result.res;
+
+  const { supabase } = result;
   const url = new URL(req.url);
   const taskId = String(url.searchParams.get("task_id") ?? "").trim();
-  if (!taskId) return bad("task_id required", 400);
+  if (!taskId) return badRequest("task_id required");
 
   const { error } = await supabase.from("case_tasks").delete().eq("case_id", id).eq("id", taskId);
-  if (error) return bad(error.message, 400);
+  if (error) return badRequest(error.message);
 
   return NextResponse.json({ ok: true });
 }

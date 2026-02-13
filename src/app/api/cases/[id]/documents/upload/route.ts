@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/utils/supabase/server";
+import { requireCaseAccess, guardAuth } from "@/lib/api/auth";
+import { badRequest } from "@/lib/api/errors";
 import { getPlanForUser } from "@/lib/billing/plan";
 
 async function enqueueJob(supabase: any, userId: string, opts: { caseId: string; jobType: string; sourceType?: string; sourceId?: string; payload?: any }) {
@@ -14,37 +15,22 @@ async function enqueueJob(supabase: any, userId: string, opts: { caseId: string;
   });
 }
 
-async function requireUser() {
-  const supabase = await createClient();
-  const { data: auth } = await supabase.auth.getUser();
-  if (!auth?.user) return { supabase, user: null, res: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
-  return { supabase, user: auth.user, res: null as any };
-}
-
-function bad(message: string, status = 400) {
-  return NextResponse.json({ error: message }, { status });
-}
-
 function safeName(name: string) {
   return name.replace(/[^a-zA-Z0-9._-]/g, "_");
 }
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { supabase, user, res } = await requireUser();
-  if (!user) return res;
-
   const { id } = await params;
+  const result = await requireCaseAccess(id);
+  if (guardAuth(result)) return result.res;
 
-  // Verify case ownership
-  const { data: c } = await supabase.from("cases").select("id").eq("id", id).eq("created_by", user.id).maybeSingle();
-  if (!c) return bad("Not found", 404);
-
+  const { supabase, user } = result;
   const body = await req.json().catch(() => ({}));
   const filenameRaw = String(body?.filename ?? "").trim();
   const mimeType = String(body?.mime_type ?? body?.mimeType ?? "").trim() || "application/octet-stream";
   const byteSize = body?.byte_size ?? body?.byteSize ?? null;
 
-  if (!filenameRaw) return bad("filename required", 400);
+  if (!filenameRaw) return badRequest("filename required");
 
   const bucket = String(body?.bucket ?? "case-documents");
   const filename = safeName(filenameRaw);
@@ -66,7 +52,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     .select("id,case_id,filename,mime_type,size_bytes,storage_bucket,storage_path,kind,status,created_at,updated_at")
     .single();
 
-  if (rowErr) return bad(rowErr.message, 400);
+  if (rowErr) return badRequest(rowErr.message);
 
   // Best-effort enqueue for proactive analysis (document added, Pro only).
   const plan = await getPlanForUser();
@@ -92,7 +78,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     } catch {
       // ignore
     }
-    return bad(error.message, 400);
+    return badRequest(error.message);
   }
 
   return NextResponse.json({

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/utils/supabase/server";
+import { requireCaseAccess, guardAuth } from "@/lib/api/auth";
+import { badRequest } from "@/lib/api/errors";
 import { getPlanForUser } from "@/lib/billing/plan";
 
 async function enqueueJob(
@@ -18,17 +19,6 @@ async function enqueueJob(
   });
 }
 
-async function requireUser() {
-  const supabase = await createClient();
-  const { data: auth } = await supabase.auth.getUser();
-  if (!auth?.user) return { supabase, user: null, res: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
-  return { supabase, user: auth.user, res: null as any };
-}
-
-function bad(message: string, status = 400) {
-  return NextResponse.json({ error: message }, { status });
-}
-
 async function getIntake(supabase: any, caseId: string) {
   const { data, error } = await supabase
     .from("case_intakes")
@@ -40,10 +30,11 @@ async function getIntake(supabase: any, caseId: string) {
 }
 
 export async function GET(_: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { supabase, user, res } = await requireUser();
-  if (!user) return res;
-
   const { id } = await params;
+  const result = await requireCaseAccess(id);
+  if (guardAuth(result)) return result.res;
+
+  const { supabase } = result;
   try {
     const item = await getIntake(supabase, id);
     return NextResponse.json({ item: item?.intake ?? {} });
@@ -53,13 +44,14 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
 }
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { supabase, user, res } = await requireUser();
-  if (!user) return res;
-
   const { id } = await params;
+  const result = await requireCaseAccess(id);
+  if (guardAuth(result)) return result.res;
+
+  const { supabase, user } = result;
   const body = await req.json().catch(() => ({}));
   const patch = body?.patch ?? null;
-  if (!patch || typeof patch !== "object") return bad("patch object required", 400);
+  if (!patch || typeof patch !== "object") return badRequest("patch object required");
 
   try {
     const current = await getIntake(supabase, id);
@@ -74,7 +66,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
     if (error) {
       console.error("PATCH /api/cases/[id]/intake failed", { message: error.message, code: (error as any).code, details: (error as any).details });
-      return bad(error.message, 400);
+      return badRequest(error.message);
     }
 
     // Only enqueue analysis when data actually changed and user is on Pro (avoids re-analysis on every page load)
@@ -98,6 +90,6 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
     return NextResponse.json({ item: data?.intake ?? nextIntake });
   } catch (e: any) {
-    return bad(e?.message ?? "Failed to update intake", 400);
+    return badRequest(e?.message ?? "Failed to update intake");
   }
 }

@@ -1,22 +1,13 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/utils/supabase/server";
-
-async function requireUser() {
-  const supabase = await createClient();
-  const { data: auth } = await supabase.auth.getUser();
-  if (!auth?.user) return { supabase, user: null, res: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
-  return { supabase, user: auth.user, res: null as any };
-}
-
-function bad(message: string, status = 400) {
-  return NextResponse.json({ error: message }, { status });
-}
+import { requireCaseAccess, guardAuth } from "@/lib/api/auth";
+import { badRequest } from "@/lib/api/errors";
 
 export async function GET(_: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { supabase, user, res } = await requireUser();
-  if (!user) return res;
-
   const { id } = await params;
+  const result = await requireCaseAccess(id);
+  if (guardAuth(result)) return result.res;
+
+  const { supabase } = result;
   const { data, error } = await supabase
     .from("case_parties")
     .select("id,case_id,role,name,notes,created_at")
@@ -25,20 +16,21 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
 
   if (error) {
     console.error("GET /api/cases/[id]/parties failed", { message: error.message, code: (error as any).code, details: (error as any).details });
-    return bad(error.message, 400);
+    return badRequest(error.message);
   }
   return NextResponse.json({ items: data ?? [] });
 }
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { supabase, user, res } = await requireUser();
-  if (!user) return res;
-
   const { id } = await params;
+  const result = await requireCaseAccess(id);
+  if (guardAuth(result)) return result.res;
+
+  const { supabase, user } = result;
   const body = await req.json().catch(() => ({}));
   const role = String(body?.role ?? "other");
   const name = String(body?.name ?? "").trim();
-  if (!name) return bad("name required", 400);
+  if (!name) return badRequest("name required");
 
   const email = String(body?.email ?? "").trim();
   const phone = String(body?.phone ?? "").trim();
@@ -65,26 +57,27 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     .select("id,case_id,role,name,notes,created_at")
     .single();
 
-  if (error) {
-    console.error("POST /api/cases/[id]/parties failed", { message: error.message, code: (error as any).code, details: (error as any).details });
-    return bad(error.message, 400);
-  }
+    if (error) {
+      console.error("POST /api/cases/[id]/parties failed", { message: error.message, code: (error as any).code, details: (error as any).details });
+      return badRequest(error.message);
+    }
   return NextResponse.json({ item: data });
 }
 
 export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { supabase, user, res } = await requireUser();
-  if (!user) return res;
-
   const { id } = await params;
+  const result = await requireCaseAccess(id);
+  if (guardAuth(result)) return result.res;
+
+  const { supabase } = result;
   const url = new URL(req.url);
   const partyId = url.searchParams.get("party_id");
-  if (!partyId) return bad("party_id required", 400);
+  if (!partyId) return badRequest("party_id required");
 
   const { error } = await supabase.from("case_parties").delete().eq("case_id", id).eq("id", partyId);
   if (error) {
     console.error("DELETE /api/cases/[id]/parties failed", { message: error.message, code: (error as any).code, details: (error as any).details });
-    return bad(error.message, 400);
+    return badRequest(error.message);
   }
 
   return NextResponse.json({ ok: true });

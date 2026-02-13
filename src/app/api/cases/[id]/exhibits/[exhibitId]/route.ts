@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/utils/supabase/server";
+import { requireCaseAccess, guardAuth } from "@/lib/api/auth";
+import { badRequest } from "@/lib/api/errors";
 
-export async function PATCH(req: Request, props: { params: Promise<{ exhibitId: string }> }) {
-  const params = await props.params;
-  const supabase = await createClient();
-  const { data: auth } = await supabase.auth.getUser();
-  if (!auth?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+export async function PATCH(req: Request, props: { params: Promise<{ id: string; exhibitId: string }> }) {
+  const { id, exhibitId } = await props.params;
+  const result = await requireCaseAccess(id);
+  if (guardAuth(result)) return result.res;
 
+  const { supabase } = result;
   const body = await req.json();
   const patch: any = {};
   if (body.title != null) patch.title = String(body.title);
@@ -17,21 +18,22 @@ export async function PATCH(req: Request, props: { params: Promise<{ exhibitId: 
   const { data, error } = await supabase
     .from("case_exhibits")
     .update(patch)
-    .eq("id", params.exhibitId)
+    .eq("case_id", id)
+    .eq("id", exhibitId)
     .select("id,case_id,file_id,code,title,description,sort,created_at")
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) return badRequest(error.message);
   return NextResponse.json({ item: data });
 }
 
-export async function DELETE(_: Request, props: { params: Promise<{ exhibitId: string }> }) {
-  const params = await props.params;
-  const supabase = await createClient();
-  const { data: auth } = await supabase.auth.getUser();
-  if (!auth?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+export async function DELETE(_: Request, props: { params: Promise<{ id: string; exhibitId: string }> }) {
+  const { id, exhibitId } = await props.params;
+  const result = await requireCaseAccess(id);
+  if (guardAuth(result)) return result.res;
 
-  const { error } = await supabase.from("case_exhibits").delete().eq("id", params.exhibitId);
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  const { supabase } = result;
+  const { error } = await supabase.from("case_exhibits").delete().eq("case_id", id).eq("id", exhibitId);
+  if (error) return badRequest(error.message);
   return NextResponse.json({ ok: true });
 }

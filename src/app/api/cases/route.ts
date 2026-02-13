@@ -1,20 +1,12 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/utils/supabase/server";
-
-async function requireUser() {
-  const supabase = await createClient();
-  const { data: auth } = await supabase.auth.getUser();
-  if (!auth?.user) return { supabase, user: null, res: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
-  return { supabase, user: auth.user, res: null as any };
-}
-
-function bad(message: string, status = 400) {
-  return NextResponse.json({ error: message }, { status });
-}
+import { requireUser, guardAuth } from "@/lib/api/auth";
+import { badRequest } from "@/lib/api/errors";
 
 export async function GET(req: Request) {
-  const { supabase, user, res } = await requireUser();
-  if (!user) return res;
+  const result = await requireUser();
+  if (guardAuth(result)) return result.res;
+
+  const { supabase, user } = result;
 
   const url = new URL(req.url);
   const q = (url.searchParams.get("q") ?? "").trim();
@@ -32,18 +24,20 @@ export async function GET(req: Request) {
   if (q) query = query.ilike("title", `%${q}%`);
 
   const { data, error, count } = await query;
-  if (error) return bad(error.message, 400);
+  if (error) return badRequest(error.message);
 
   return NextResponse.json({ items: data ?? [], count: count ?? (data?.length ?? 0) });
 }
 
 export async function POST(req: Request) {
-  const { supabase, user, res } = await requireUser();
-  if (!user) return res;
+  const result = await requireUser();
+  if (guardAuth(result)) return result.res;
+
+  const { supabase, user } = result;
 
   const body = await req.json().catch(() => ({}));
   const title = String(body?.title ?? "").trim();
-  if (!title) return bad("title required", 400);
+  if (!title) return badRequest("title required");
 
   const statusRaw = String(body?.status ?? "active").trim().toLowerCase();
   const status = statusRaw === "archived" || statusRaw === "active" ? statusRaw : "active";
@@ -64,7 +58,7 @@ export async function POST(req: Request) {
 
   if (error) {
     console.error("POST /api/cases insert failed", { message: error.message, code: (error as any).code, details: (error as any).details });
-    return bad(error.message, 400);
+    return badRequest(error.message);
   }
   return NextResponse.json({ item: data });
 }

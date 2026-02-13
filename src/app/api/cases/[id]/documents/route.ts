@@ -1,16 +1,6 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/utils/supabase/server";
-
-async function requireUser() {
-  const supabase = await createClient();
-  const { data: auth } = await supabase.auth.getUser();
-  if (!auth?.user) return { supabase, user: null, res: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
-  return { supabase, user: auth.user, res: null as any };
-}
-
-function bad(message: string, status = 400) {
-  return NextResponse.json({ error: message }, { status });
-}
+import { requireCaseAccess, guardAuth } from "@/lib/api/auth";
+import { badRequest } from "@/lib/api/errors";
 
 function mapDoc(row: any) {
   return {
@@ -29,16 +19,13 @@ function mapDoc(row: any) {
 }
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { supabase, user, res } = await requireUser();
-  if (!user) return res;
-
   const { id } = await params;
+  const result = await requireCaseAccess(id);
+  if (guardAuth(result)) return result.res;
+
+  const { supabase, user } = result;
   const url = new URL(req.url);
   const limit = Math.min(Math.max(Number(url.searchParams.get("limit") ?? 200), 1), 1000);
-
-  // Verify case ownership
-  const { data: c } = await supabase.from("cases").select("id").eq("id", id).eq("created_by", user.id).maybeSingle();
-  if (!c) return bad("Not found", 404);
 
   const { data, error } = await supabase
     .from("documents")
@@ -48,18 +35,19 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     .order("created_at", { ascending: false })
     .limit(limit);
 
-  if (error) return bad(error.message, 400);
+  if (error) return badRequest(error.message);
   return NextResponse.json({ items: (data ?? []).map(mapDoc) });
 }
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { supabase, user, res } = await requireUser();
-  if (!user) return res;
-
   const { id } = await params;
+  const result = await requireCaseAccess(id);
+  if (guardAuth(result)) return result.res;
+
+  const { supabase, user } = result;
   const body = await req.json().catch(() => ({}));
   const filename = String(body?.filename ?? "").trim();
-  if (!filename) return bad("filename required", 400);
+  if (!filename) return badRequest("filename required");
 
   const payload: any = {
     case_id: id,
@@ -79,6 +67,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     .select("id,case_id,filename,mime_type,size_bytes,storage_bucket,storage_path,kind,status,created_at,updated_at")
     .single();
 
-  if (error) return bad(error.message, 400);
+  if (error) return badRequest(error.message);
   return NextResponse.json({ item: mapDoc(data) });
 }

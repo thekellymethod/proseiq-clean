@@ -1,18 +1,8 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/utils/supabase/server";
+import { requireCaseAccess, guardAuth } from "@/lib/api/auth";
+import { badRequest, notFound } from "@/lib/api/errors";
 import { buildDocx } from "@/lib/docx";
 import { richToPlain } from "@/lib/draft-filing-checks";
-
-async function requireUser() {
-  const supabase = await createClient();
-  const { data: auth } = await supabase.auth.getUser();
-  if (!auth?.user) return { supabase, user: null, res: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
-  return { supabase, user: auth.user, res: null as any };
-}
-
-function bad(message: string, status = 400) {
-  return NextResponse.json({ error: message }, { status });
-}
 
 function mdToPlain(md: string) {
   return String(md ?? "")
@@ -24,10 +14,11 @@ function mdToPlain(md: string) {
 }
 
 export async function GET(_: Request, { params }: { params: Promise<{ id: string; draftId: string }> }) {
-  const { supabase, user, res } = await requireUser();
-  if (!user) return res;
-
   const { id, draftId } = await params;
+  const result = await requireCaseAccess(id);
+  if (guardAuth(result)) return result.res;
+
+  const { supabase } = result;
   const [{ data: draft, error }, { data: intakeRow }, { data: parties }] = await Promise.all([
     supabase
       .from("case_drafts")
@@ -39,8 +30,8 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
     supabase.from("case_parties").select("id,role,name").eq("case_id", id),
   ]);
 
-  if (error) return bad(error.message, 400);
-  if (!draft) return bad("Not found", 404);
+  if (error) return badRequest(error.message);
+  if (!draft) return notFound("Draft not found");
 
   const title = String(draft.title ?? "Draft");
   const rich = draft.content_rich && typeof draft.content_rich === "object" ? draft.content_rich : null;

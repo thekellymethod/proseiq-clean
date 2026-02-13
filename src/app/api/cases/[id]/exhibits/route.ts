@@ -1,16 +1,6 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/utils/supabase/server";
-
-async function requireUser() {
-  const supabase = await createClient();
-  const { data: auth } = await supabase.auth.getUser();
-  if (!auth?.user) return { supabase, user: null, res: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
-  return { supabase, user: auth.user, res: null as any };
-}
-
-function bad(message: string, status = 400) {
-  return NextResponse.json({ error: message }, { status });
-}
+import { requireCaseAccess, guardAuth } from "@/lib/api/auth";
+import { badRequest } from "@/lib/api/errors";
 
 function mapEx(row: any) {
   return {
@@ -31,10 +21,11 @@ function mapEx(row: any) {
 }
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { supabase, user, res } = await requireUser();
-  if (!user) return res;
-
   const { id } = await params;
+  const result = await requireCaseAccess(id);
+  if (guardAuth(result)) return result.res;
+
+  const { supabase } = result;
   const { data, error } = await supabase
     .from("case_exhibits")
     .select("id,case_id,exhibit_no,label,title,description,proof_notes,source,file_path,url,sort_order,created_at,updated_at")
@@ -42,18 +33,19 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     .order("sort_order", { ascending: true })
     .order("exhibit_no", { ascending: true });
 
-  if (error) return bad(error.message, 400);
+  if (error) return badRequest(error.message);
   return NextResponse.json({ items: (data ?? []).map(mapEx) });
 }
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { supabase, user, res } = await requireUser();
-  if (!user) return res;
-
   const { id } = await params;
+  const result = await requireCaseAccess(id);
+  if (guardAuth(result)) return result.res;
+
+  const { supabase, user } = result;
   const body = await req.json().catch(() => ({}));
   const title = String(body?.title ?? "").trim();
-  if (!title) return bad("title required", 400);
+  if (!title) return badRequest("title required");
 
   const { data: last } = await supabase
     .from("case_exhibits")
@@ -84,18 +76,19 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     .select("id,case_id,exhibit_no,label,title,description,proof_notes,source,file_path,url,sort_order,created_at,updated_at")
     .single();
 
-  if (error) return bad(error.message, 400);
+  if (error) return badRequest(error.message);
   return NextResponse.json({ item: mapEx(data) });
 }
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { supabase, user, res } = await requireUser();
-  if (!user) return res;
-
   const { id } = await params;
+  const result = await requireCaseAccess(id);
+  if (guardAuth(result)) return result.res;
+
+  const { supabase } = result;
   const body = await req.json().catch(() => ({}));
   const exhibitId = String(body?.exhibit_id ?? body?.id ?? "").trim();
-  if (!exhibitId) return bad("exhibit_id required", 400);
+  if (!exhibitId) return badRequest("exhibit_id required");
 
   const incoming = body?.patch && typeof body.patch === "object" ? body.patch : body;
   const patch: any = {};
@@ -116,21 +109,22 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     .select("id,case_id,exhibit_no,label,title,description,proof_notes,source,file_path,url,sort_order,created_at,updated_at")
     .single();
 
-  if (error) return bad(error.message, 400);
+  if (error) return badRequest(error.message);
   return NextResponse.json({ item: mapEx(data) });
 }
 
 export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { supabase, user, res } = await requireUser();
-  if (!user) return res;
-
   const { id } = await params;
+  const result = await requireCaseAccess(id);
+  if (guardAuth(result)) return result.res;
+
+  const { supabase } = result;
   const url = new URL(req.url);
   const exhibitId = url.searchParams.get("exhibit_id");
-  if (!exhibitId) return bad("exhibit_id required", 400);
+  if (!exhibitId) return badRequest("exhibit_id required");
 
   const { error } = await supabase.from("case_exhibits").delete().eq("case_id", id).eq("id", exhibitId);
-  if (error) return bad(error.message, 400);
+  if (error) return badRequest(error.message);
 
   return NextResponse.json({ ok: true });
 }

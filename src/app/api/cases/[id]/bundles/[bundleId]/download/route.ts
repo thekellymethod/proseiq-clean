@@ -1,22 +1,13 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/utils/supabase/server";
-
-async function requireUser() {
-  const supabase = await createClient();
-  const { data: auth } = await supabase.auth.getUser();
-  if (!auth?.user) return { supabase, user: null, res: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
-  return { supabase, user: auth.user, res: null as any };
-}
-
-function bad(message: string, status = 400) {
-  return NextResponse.json({ error: message }, { status });
-}
+import { requireCaseAccess, guardAuth } from "@/lib/api/auth";
+import { badRequest, notFound, conflict } from "@/lib/api/errors";
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string; bundleId: string }> }) {
-  const { supabase, user, res } = await requireUser();
-  if (!user) return res;
-
   const { id, bundleId } = await params;
+  const result = await requireCaseAccess(id);
+  if (guardAuth(result)) return result.res;
+
+  const { supabase } = result;
   const { data: bundle, error } = await supabase
     .from("case_bundles")
     .select("id,status,storage_bucket,storage_path,output_path,title")
@@ -24,19 +15,19 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     .eq("id", bundleId)
     .maybeSingle();
 
-  if (error) return bad(error.message, 400);
-  if (!bundle) return bad("Not found", 404);
+  if (error) return badRequest(error.message);
+  if (!bundle) return notFound("Bundle not found");
 
   const bucket = bundle.storage_bucket || "case-files";
   const path = bundle.storage_path || bundle.output_path;
 
   if (bundle.status !== "ready" || !path) {
-    return bad("Bundle not ready. Process it first.", 409);
+    return conflict("Bundle not ready. Process it first.");
   }
 
   const { data: blob, error: dlErr } = await supabase.storage.from(bucket).download(path);
-  if (dlErr) return bad(dlErr.message, 400);
-  if (!blob) return bad("Bundle not found", 404);
+  if (dlErr) return badRequest(dlErr.message);
+  if (!blob) return notFound("Bundle not found");
 
   const bytes = Buffer.from(await blob.arrayBuffer());
   const filename = `${bundle.title || bundle.id}.zip`.replace(/[^a-zA-Z0-9._-]+/g, "_");

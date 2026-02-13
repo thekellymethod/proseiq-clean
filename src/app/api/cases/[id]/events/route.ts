@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/utils/supabase/server";
+import { requireCaseAccess, guardAuth } from "@/lib/api/auth";
+import { badRequest } from "@/lib/api/errors";
 import { getPlanForUser } from "@/lib/billing/plan";
 
 async function enqueueJob(supabase: any, userId: string, opts: { caseId: string; jobType: string; sourceType?: string; sourceId?: string; payload?: any }) {
@@ -15,12 +16,11 @@ async function enqueueJob(supabase: any, userId: string, opts: { caseId: string;
 }
 
 export async function GET(req: Request, context: { params: Promise<{ id: string }> }) {
-  const supabase = await createClient();
-  const { data: auth } = await supabase.auth.getUser();
-  if (!auth?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
   const { id: caseId } = await context.params;
+  const result = await requireCaseAccess(caseId);
+  if (guardAuth(result)) return result.res;
 
+  const { supabase } = result;
   const url = new URL(req.url);
   const limit = Math.min(Number(url.searchParams.get("limit") ?? "200") || 200, 500);
 
@@ -31,22 +31,21 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
     .order("event_at", { ascending: true })
     .limit(limit);
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) return badRequest(error.message);
   return NextResponse.json({ items: data ?? [] });
 }
 
 export async function POST(req: Request, context: { params: Promise<{ id: string }> }) {
-  const supabase = await createClient();
-  const { data: auth } = await supabase.auth.getUser();
-  if (!auth?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
   const { id: caseId } = await context.params;
+  const result = await requireCaseAccess(caseId);
+  if (guardAuth(result)) return result.res;
 
+  const { supabase, user } = result;
   const body = await req.json().catch(() => ({}));
   const { event_at, title, kind = "note", notes = null } = body ?? {};
 
   if (!event_at || !title) {
-    return NextResponse.json({ error: "event_at and title required" }, { status: 400 });
+    return badRequest("event_at and title required");
   }
 
   const { data, error } = await supabase
@@ -61,13 +60,13 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
     .select("id,case_id,event_at,kind,title,notes,created_at")
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) return badRequest(error.message);
 
   // Best-effort enqueue for proactive analysis (Pro only).
   const plan = await getPlanForUser();
   if (plan === "pro") {
     try {
-      await enqueueJob(supabase, auth.user.id, {
+      await enqueueJob(supabase, user.id, {
         caseId,
         jobType: "event_created",
         sourceType: "case_events",

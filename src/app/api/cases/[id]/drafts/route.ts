@@ -1,22 +1,13 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/utils/supabase/server";
-
-async function requireUser() {
-  const supabase = await createClient();
-  const { data: auth } = await supabase.auth.getUser();
-  if (!auth?.user) return { supabase, user: null, res: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
-  return { supabase, user: auth.user, res: null as any };
-}
-
-function bad(message: string, status = 400) {
-  return NextResponse.json({ error: message }, { status });
-}
+import { requireCaseAccess, guardAuth } from "@/lib/api/auth";
+import { badRequest } from "@/lib/api/errors";
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { supabase, user, res } = await requireUser();
-  if (!user) return res;
-
   const { id } = await params;
+  const result = await requireCaseAccess(id);
+  if (guardAuth(result)) return result.res;
+
+  const { supabase } = result;
   const url = new URL(req.url);
   const kind = (url.searchParams.get("kind") ?? "").trim();
   const limit = Math.min(Math.max(Number(url.searchParams.get("limit") ?? 200), 1), 2000);
@@ -31,19 +22,20 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   if (kind) query = query.eq("kind", kind);
 
   const { data, error } = await query;
-  if (error) return bad(error.message, 400);
+  if (error) return badRequest(error.message);
 
   return NextResponse.json({ items: data ?? [] });
 }
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { supabase, user, res } = await requireUser();
-  if (!user) return res;
-
   const { id } = await params;
+  const result = await requireCaseAccess(id);
+  if (guardAuth(result)) return result.res;
+
+  const { supabase, user } = result;
   const body = await req.json().catch(() => ({}));
   const title = String(body?.title ?? "").trim();
-  if (!title) return bad("title required", 400);
+  if (!title) return badRequest("title required");
 
   const payload: any = {
     case_id: id,
@@ -62,6 +54,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     .select("id,case_id,title,kind,status,template_id,created_at,updated_at")
     .single();
 
-  if (error) return bad(error.message, 400);
+  if (error) return badRequest(error.message);
   return NextResponse.json({ item: data });
 }

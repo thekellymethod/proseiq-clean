@@ -1,48 +1,38 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/utils/supabase/server";
-
-async function requireUser() {
-  const supabase = await createClient();
-  const { data: auth } = await supabase.auth.getUser();
-  if (!auth?.user) return { supabase, user: null, res: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
-  return { supabase, user: auth.user, res: null as any };
-}
-
-function bad(message: string, status = 400) {
-  return NextResponse.json({ error: message }, { status });
-}
+import { requireCaseAccess, guardAuth } from "@/lib/api/auth";
+import { badRequest, notFound } from "@/lib/api/errors";
 
 function safeName(name: string) {
   return name.replace(/[^a-zA-Z0-9._-]/g, "_");
 }
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string; draftId: string }> }) {
-  const { supabase, user, res } = await requireUser();
-  if (!user) return res;
-
   const { id, draftId } = await params;
+  const result = await requireCaseAccess(id);
+  if (guardAuth(result)) return result.res;
+
+  const { supabase, user } = result;
   const body = await req.json().catch(() => ({}));
 
   const filenameRaw = String(body?.filename ?? "").trim();
   const mimeType = String(body?.mime_type ?? body?.mimeType ?? "").trim() || "image/png";
-  if (!filenameRaw) return bad("filename required", 400);
+  if (!filenameRaw) return badRequest("filename required");
 
-  // Ensure draft exists and belongs to this case (and RLS applies to created_by).
   const { data: draft, error: dErr } = await supabase
     .from("case_drafts")
     .select("id")
     .eq("case_id", id)
     .eq("id", draftId)
     .maybeSingle();
-  if (dErr) return bad(dErr.message, 400);
-  if (!draft) return bad("Not found", 404);
+  if (dErr) return badRequest(dErr.message);
+  if (!draft) return notFound("Draft not found");
 
   const bucket = String(body?.bucket ?? "case-signatures");
   const filename = safeName(filenameRaw);
   const objectPath = `${user.id}/${id}/signatures/${draftId}/${crypto.randomUUID()}-${filename}`;
 
   const { data, error } = await supabase.storage.from(bucket).createSignedUploadUrl(objectPath);
-  if (error) return bad(error.message, 400);
+  if (error) return badRequest(error.message);
 
   return NextResponse.json({
     upload: {

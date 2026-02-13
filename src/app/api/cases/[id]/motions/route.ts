@@ -1,24 +1,15 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/utils/supabase/server";
-
-async function requireUser() {
-  const supabase = await createClient();
-  const { data: auth } = await supabase.auth.getUser();
-  if (!auth?.user) return { supabase, user: null, res: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
-  return { supabase, user: auth.user, res: null as any };
-}
-
-function bad(message: string, status = 400) {
-  return NextResponse.json({ error: message }, { status });
-}
+import { requireCaseAccess, guardAuth } from "@/lib/api/auth";
+import { badRequest } from "@/lib/api/errors";
 
 const MOTION_KIND = "motion";
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { supabase, user, res } = await requireUser();
-  if (!user) return res;
-
   const { id } = await params;
+  const result = await requireCaseAccess(id);
+  if (guardAuth(result)) return result.res;
+
+  const { supabase } = result;
   const url = new URL(req.url);
   const limit = Math.min(Math.max(Number(url.searchParams.get("limit") ?? 200), 1), 1000);
 
@@ -30,7 +21,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     .order("updated_at", { ascending: false })
     .limit(limit);
 
-  if (error) return bad(error.message, 400);
+  if (error) return badRequest(error.message);
 
   const items = (data ?? []).map((r: any) => ({
     id: r.id,
@@ -45,13 +36,14 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
 }
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { supabase, user, res } = await requireUser();
-  if (!user) return res;
-
   const { id } = await params;
+  const result = await requireCaseAccess(id);
+  if (guardAuth(result)) return result.res;
+
+  const { supabase, user } = result;
   const body = await req.json().catch(() => ({}));
   const name = String(body?.name ?? body?.title ?? "").trim();
-  if (!name) return bad("name required", 400);
+  if (!name) return badRequest("name required");
 
   const status = String(body?.status ?? "idea").trim() || "idea";
   const purpose = String(body?.purpose ?? "").trim();
@@ -72,7 +64,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     .select("id,title,notes,status,created_at,updated_at")
     .single();
 
-  if (error) return bad(error.message, 400);
+  if (error) return badRequest(error.message);
 
   return NextResponse.json({
     item: {
@@ -87,14 +79,15 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 }
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { supabase, user, res } = await requireUser();
-  if (!user) return res;
-
   const { id } = await params;
+  const result = await requireCaseAccess(id);
+  if (guardAuth(result)) return result.res;
+
+  const { supabase } = result;
   const body = await req.json().catch(() => ({}));
   const motionId = String(body?.motion_id ?? body?.id ?? "").trim();
   const incoming = body?.patch && typeof body.patch === "object" ? body.patch : body;
-  if (!motionId) return bad("motion_id required", 400);
+  if (!motionId) return badRequest("motion_id required");
 
   const patch: any = {};
   if ("name" in incoming || "title" in incoming) patch.title = String((incoming as any).name ?? (incoming as any).title ?? "").trim();
@@ -102,7 +95,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   if ("status" in incoming) patch.status = String((incoming as any).status ?? "").trim();
   patch.updated_at = new Date().toISOString();
 
-  if (Object.keys(patch).length === 0) return bad("No fields to update", 400);
+  if (Object.keys(patch).length === 0) return badRequest("No fields to update");
 
   const { data, error } = await supabase
     .from("case_tasks")
@@ -113,7 +106,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     .select("id,title,notes,status,created_at,updated_at")
     .single();
 
-  if (error) return bad(error.message, 400);
+  if (error) return badRequest(error.message);
 
   return NextResponse.json({
     item: {
@@ -128,13 +121,14 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 }
 
 export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { supabase, user, res } = await requireUser();
-  if (!user) return res;
-
   const { id } = await params;
+  const result = await requireCaseAccess(id);
+  if (guardAuth(result)) return result.res;
+
+  const { supabase } = result;
   const url = new URL(req.url);
   const motionId = String(url.searchParams.get("motion_id") ?? "").trim();
-  if (!motionId) return bad("motion_id required", 400);
+  if (!motionId) return badRequest("motion_id required");
 
   const { error } = await supabase
     .from("case_tasks")
@@ -143,7 +137,7 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
     .eq("kind", MOTION_KIND)
     .eq("id", motionId);
 
-  if (error) return bad(error.message, 400);
+  if (error) return badRequest(error.message);
   return NextResponse.json({ ok: true });
 }
 

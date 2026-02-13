@@ -1,28 +1,15 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/utils/supabase/server";
-
-async function requireUser() {
-  const supabase = await createClient();
-  const { data: auth } = await supabase.auth.getUser();
-  if (!auth?.user) return { supabase, user: null, res: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
-  return { supabase, user: auth.user, res: null as any };
-}
-
-function bad(message: string, status = 400) {
-  return NextResponse.json({ error: message }, { status });
-}
+import { requireCaseAccess, guardAuth } from "@/lib/api/auth";
+import { badRequest, notFound } from "@/lib/api/errors";
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string; docId: string }> }) {
-  const { supabase, user, res } = await requireUser();
-  if (!user) return res;
-
   const { id, docId } = await params;
+  const result = await requireCaseAccess(id);
+  if (guardAuth(result)) return result.res;
+
+  const { supabase, user } = result;
   const url = new URL(req.url);
   const expiresIn = Math.min(Math.max(Number(url.searchParams.get("expiresIn") ?? 900), 60), 7 * 24 * 3600);
-
-  // Verify case ownership and fetch document
-  const { data: c } = await supabase.from("cases").select("id").eq("id", id).eq("created_by", user.id).maybeSingle();
-  if (!c) return bad("Not found", 404);
 
   const { data: doc, error } = await supabase
     .from("documents")
@@ -32,12 +19,12 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     .eq("created_by", user.id)
     .maybeSingle();
 
-  if (error) return bad(error.message, 400);
-  if (!doc) return bad("Not found", 404);
-  if (!doc.storage_bucket || !doc.storage_path) return bad("Document has no storage location", 400);
+  if (error) return badRequest(error.message);
+  if (!doc) return notFound("Document not found");
+  if (!doc.storage_bucket || !doc.storage_path) return badRequest("Document has no storage location");
 
   const { data, error: signErr } = await supabase.storage.from(doc.storage_bucket).createSignedUrl(doc.storage_path, expiresIn);
-  if (signErr) return bad(signErr.message, 400);
+  if (signErr) return badRequest(signErr.message);
 
   let downloadUrl: string | null = null;
   if (data?.signedUrl) {
