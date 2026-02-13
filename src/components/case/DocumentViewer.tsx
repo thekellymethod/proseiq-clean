@@ -80,7 +80,13 @@ export default function DocumentViewer({ caseId, docId }: { caseId: string; docI
       {!loading && !error && signedUrl ? (
         <div className="mt-4 overflow-hidden rounded-xl border border-white/10 bg-black/20">
           {/* In-app PDF viewer (works for PDFs; other file types fall back to browser viewer) */}
-          <iframe title="Document viewer" src={signedUrl} className="h-[75vh] w-full" />
+          <iframe
+            title="Document viewer"
+            src={signedUrl}
+            className="h-[75vh] w-full min-h-[400px]"
+            sandbox="allow-same-origin allow-scripts"
+            referrerPolicy="no-referrer"
+          />
         </div>
       ) : null}
     </section>

@@ -8,16 +8,16 @@ export async function POST(req: Request) {
   if (!auth?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await req.json().catch(() => ({}));
-  const interval = body?.interval === "annual" ? "annual" : "monthly";
+  const plan = body?.plan === "pro" ? "pro" : "basic";
 
   const priceId =
-    interval === "annual"
-      ? process.env.STRIPE_PRICE_ID_ANNUAL
-      : process.env.STRIPE_PRICE_ID_MONTHLY;
+    plan === "pro"
+      ? process.env.STRIPE_PRICE_ID_PRO
+      : process.env.STRIPE_PRICE_ID_BASIC;
 
   if (!priceId) {
     return NextResponse.json(
-      { error: "Missing Stripe price env var for selected interval" },
+      { error: "Missing Stripe price env var for selected plan" },
       { status: 500 }
     );
   }

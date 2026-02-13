@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
+import { getPlanForUser } from "@/lib/billing/plan";
 
 async function enqueueJob(
   supabase: any,
@@ -76,19 +77,22 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       return bad(error.message, 400);
     }
 
-    // Only enqueue analysis when data actually changed (avoids re-analysis on every page load)
+    // Only enqueue analysis when data actually changed and user is on Pro (avoids re-analysis on every page load)
     const hasChanged = JSON.stringify(nextIntake) !== JSON.stringify(currentIntake);
     if (hasChanged) {
-      try {
-        await enqueueJob(supabase, user.id, {
-          caseId: id,
-          jobType: "intake_updated",
-          sourceType: "case_intakes",
-          sourceId: null,
-          payload: { patchKeys: Object.keys(patch ?? {}) },
-        });
-      } catch {
-        // ignore
+      const plan = await getPlanForUser();
+      if (plan === "pro") {
+        try {
+          await enqueueJob(supabase, user.id, {
+            caseId: id,
+            jobType: "intake_updated",
+            sourceType: "case_intakes",
+            sourceId: null,
+            payload: { patchKeys: Object.keys(patch ?? {}) },
+          });
+        } catch {
+          // ignore
+        }
       }
     }
 

@@ -11,6 +11,9 @@ const NAV: NavItem[] = [
   { href: "/dashboard/account", label: "Account" },
 ];
 
+// Show pricing link when not on dashboard (landing page)
+const LANDING_NAV: NavItem[] = [{ href: "/#pricing", label: "Pricing" }];
+
 export default async function AppHeader() {
   const supabase = await createClient();
   const { data } = await supabase.auth.getUser();
@@ -43,7 +46,7 @@ export default async function AppHeader() {
         </div>
 
         <nav className="hidden md:flex items-center gap-2">
-          {NAV.map((n) => (
+          {(user ? NAV : LANDING_NAV).map((n) => (
             <Link
               key={n.href}
               href={n.href}

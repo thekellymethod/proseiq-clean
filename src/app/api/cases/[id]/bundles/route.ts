@@ -19,7 +19,7 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
   const { id } = await params;
   const { data, error } = await supabase
     .from("case_bundles")
-    .select("id,case_id,title,status,kind,include_bates,bates_prefix,bates_start,output_path,error,created_at,updated_at")
+    .select("id,case_id,title,status,kind,include_bates,bates_prefix,bates_start,output_path,storage_path,storage_bucket,error,created_at,updated_at")
     .eq("case_id", id)
     .order("created_at", { ascending: false });
 
@@ -46,7 +46,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const { data: bundle, error } = await supabase
     .from("case_bundles")
     .insert({ case_id: id, created_by: user.id, title, status: "queued", kind, include_bates, bates_prefix, bates_start, manifest })
-    .select("id,case_id,title,status,kind,include_bates,bates_prefix,bates_start,output_path,error,created_at,updated_at")
+    .select("id,case_id,title,status,kind,include_bates,bates_prefix,bates_start,output_path,storage_path,storage_bucket,error,created_at,updated_at")
     .single();
 
   if (error) return bad(error.message, 400);

@@ -147,6 +147,7 @@ export default function CaseDocuments({ params }: { params: { caseId: string } }
             <input
               type="file"
               className="hidden"
+              accept="application/pdf,.pdf,image/*,.png,.jpg,.jpeg,.gif,.webp,.doc,.docx,.txt"
               onChange={(e) => {
                 const f = e.target.files?.[0];
                 if (f) uploadOne(f);

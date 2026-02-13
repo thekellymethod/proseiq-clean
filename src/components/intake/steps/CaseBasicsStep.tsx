@@ -25,7 +25,7 @@ export default function CaseBasicsStep({
           className="w-full rounded-md border border-white/10 bg-black/30 px-3 py-2 text-white outline-none focus:border-amber-300/40"
           value={basics.title ?? ""}
           onChange={(e) => update({ title: e.target.value })}
-          placeholder="e.g., Kelly v. Public Storage"
+          placeholder="e.g., Plaintiff v. Defendant"
         />
       </div>
 
@@ -46,7 +46,7 @@ export default function CaseBasicsStep({
             className="w-full rounded-md border border-white/10 bg-black/30 px-3 py-2 text-white outline-none focus:border-amber-300/40"
             value={basics.court ?? ""}
             onChange={(e) => update({ court: e.target.value })}
-            placeholder="e.g., District Court, Dallas County"
+            placeholder="e.g., County District Court"
           />
         </div>
 
@@ -56,7 +56,7 @@ export default function CaseBasicsStep({
             className="w-full rounded-md border border-white/10 bg-black/30 px-3 py-2 text-white outline-none focus:border-amber-300/40"
             value={basics.jurisdiction ?? ""}
             onChange={(e) => update({ jurisdiction: e.target.value })}
-            placeholder="e.g., Texas / Federal"
+            placeholder="e.g., State or Federal"
           />
         </div>
       </div>

@@ -36,10 +36,15 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   const url = new URL(req.url);
   const limit = Math.min(Math.max(Number(url.searchParams.get("limit") ?? 200), 1), 1000);
 
+  // Verify case ownership
+  const { data: c } = await supabase.from("cases").select("id").eq("id", id).eq("created_by", user.id).maybeSingle();
+  if (!c) return bad("Not found", 404);
+
   const { data, error } = await supabase
     .from("documents")
     .select("id,case_id,filename,mime_type,size_bytes,storage_bucket,storage_path,kind,status,created_at,updated_at")
     .eq("case_id", id)
+    .eq("created_by", user.id)
     .order("created_at", { ascending: false })
     .limit(limit);
 

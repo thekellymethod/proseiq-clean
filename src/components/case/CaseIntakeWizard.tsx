@@ -123,7 +123,7 @@ export default function CaseIntakeWizard({ caseId }: { caseId: string }) {
     if (!confirm("Remove this party?")) return;
     setBusy(true);
     try {
-      await fetch(`/api/cases/${caseId}/parties?partyId=${id}`, { method: "DELETE" });
+      await fetch(`/api/cases/${caseId}/parties?party_id=${encodeURIComponent(id)}`, { method: "DELETE" });
       await load();
     } finally {
       setBusy(false);
@@ -135,7 +135,7 @@ export default function CaseIntakeWizard({ caseId }: { caseId: string }) {
     setBusy(true);
     try {
       await saveIntake();
-      const r = await fetch(`/api/cases/${caseId}/seed`, { method: "POST" });
+      const r = await fetch(`/api/cases/${caseId}/intake/seed`, { method: "POST" });
       const j = await r.json();
       if (!r.ok) throw new Error(j?.error || "Failed to seed case.");
 
@@ -215,7 +215,7 @@ export default function CaseIntakeWizard({ caseId }: { caseId: string }) {
               <input
                 value={intake.jurisdiction}
                 onChange={(e) => setField("jurisdiction", e.target.value)}
-                placeholder="e.g., Texas, Federal, AAA"
+                placeholder="e.g., State, Federal, AAA"
                 className="w-full rounded-md border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder:text-white/40"
               />
             </div>
@@ -225,7 +225,7 @@ export default function CaseIntakeWizard({ caseId }: { caseId: string }) {
               <input
                 value={intake.venue}
                 onChange={(e) => setField("venue", e.target.value)}
-                placeholder="e.g., Dallas County, Northern District"
+                placeholder="e.g., County, District"
                 className="w-full rounded-md border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder:text-white/40"
               />
             </div>

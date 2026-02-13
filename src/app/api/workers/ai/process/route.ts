@@ -1,15 +1,8 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/utils/supabase/server";
 import { generateObject } from "ai";
 import { openai } from "@ai-sdk/openai";
 import { z } from "zod";
-
-async function requireUser() {
-  const supabase = await createClient();
-  const { data: auth } = await supabase.auth.getUser();
-  if (!auth?.user) return { supabase, user: null, res: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
-  return { supabase, user: auth.user, res: null as any };
-}
+import { requireProPlan } from "@/lib/billing/requireActiveSub";
 
 function bad(message: string, status = 400) {
   return NextResponse.json({ error: message }, { status });
@@ -33,6 +26,16 @@ const OutputSchema = z.object({
     .default([]),
   motions: z.array(z.string()).default([]),
   elementsChecklist: z.array(z.string()).default([]),
+  elementsSatisfied: z
+    .array(
+      z.object({
+        element: z.string(),
+        satisfied: z.boolean(),
+        evidence: z.string().optional(),
+      })
+    )
+    .optional()
+    .default([]),
   rabbitTrails: z.array(z.string()).default([]),
 });
 
@@ -42,8 +45,8 @@ const WorkerResultSchema = z.object({
 });
 
 export async function POST(req: Request) {
-  const { supabase, user, res } = await requireUser();
-  if (!user) return res;
+  const { supabase, user, res } = await requireProPlan();
+  if (res) return res;
 
   if (!process.env.OPENAI_API_KEY) return bad("AI is not configured (missing OPENAI_API_KEY).", 501);
 
@@ -94,6 +97,7 @@ export async function POST(req: Request) {
         "- nextActions (<=5)",
         "- possible motions (if appropriate)",
         "- elementsChecklist (what must be proven / what evidence is missing) (<=8 items)",
+        "- elementsSatisfied: for each claim element, mark satisfied (true/false) with brief evidence or gap note",
         "- rabbitTrails (things to avoid) (<=5 items)",
         "- deadlines: only if strongly suggested; otherwise leave empty",
         "",

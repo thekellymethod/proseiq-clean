@@ -15,6 +15,19 @@ function cx(...s: Array<string | false | null | undefined>) {
   return s.filter(Boolean).join(" ");
 }
 
+function formatRelative(iso: string) {
+  try {
+    const d = new Date(iso);
+    const diff = Date.now() - d.getTime();
+    if (diff < 60_000) return "just now";
+    if (diff < 3600_000) return `${Math.floor(diff / 60_000)} min ago`;
+    if (diff < 86400_000) return `${Math.floor(diff / 3600_000)} hr ago`;
+    return d.toLocaleDateString();
+  } catch {
+    return "";
+  }
+}
+
 export default function CaseFocusPanel({
   caseId,
   openaiConfigured,
@@ -152,9 +165,9 @@ export default function CaseFocusPanel({
         </div>
       )}
 
-      {outputs.length > 0 ? (
+      {outputs.length > 0 && outputs[0].updated_at ? (
         <div className="mt-4 text-xs text-white/50">
-          Latest: <span className="text-white/70">{outputs[0].title}</span>
+          Last updated {formatRelative(outputs[0].updated_at)}
         </div>
       ) : null}
     </section>

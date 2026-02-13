@@ -12,8 +12,8 @@ Add to `.env.local` and production:
 # Stripe
 STRIPE_SECRET_KEY=sk_live_or_test_...
 STRIPE_WEBHOOK_SECRET=whsec_...
-STRIPE_PRICE_ID_MONTHLY=price_...
-STRIPE_PRICE_ID_ANNUAL=price_...   # optional
+STRIPE_PRICE_ID_BASIC=price_...   # $29/mo
+STRIPE_PRICE_ID_PRO=price_...     # $59/mo
 
 # App URL (use real domain in production)
 NEXT_PUBLIC_APP_URL=http://localhost:3000
@@ -30,12 +30,29 @@ In Stripe Dashboard → Developers → Webhooks:
 - **Events:** `checkout.session.completed`, `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted`
 - Copy the signing secret into `STRIPE_WEBHOOK_SECRET`
 
-## 4. Gating Paid Features
+## 4. Plans
 
-Use `requireActiveSubscription()` from `@/lib/billing/requireActiveSub` in API routes that require an active subscription:
+| Plan   | Env var              | Price   | Included features |
+|--------|----------------------|---------|-------------------|
+| Basic  | `STRIPE_PRICE_ID_BASIC` | $29/mo  | Case workspace, events, documents, exhibits, drafts, export, bundles, tasks |
+| Pro    | `STRIPE_PRICE_ID_PRO`   | $59/mo  | Basic + 3D timeline, legal research, AI Assistant, coaching tools |
+
+## 5. Gating Paid Features
+
+Use `requireActiveSubscription()` from `@/lib/billing/requireActiveSub`:
 
 ```ts
-const { supabase, user, res } = await requireActiveSubscription();
+const { supabase, user, res, plan } = await requireActiveSubscription();
 if (res) return res;
-// ... user has active subscription
+// plan is "basic" | "pro"
+```
+
+To gate Pro-only features:
+
+```ts
+import { isProPlan } from "@/lib/billing/plan";
+
+if (sub.price_id === process.env.STRIPE_PRICE_ID_PRO) {
+  // allow pro features
+}
 ```

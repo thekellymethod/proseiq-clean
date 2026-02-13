@@ -25,12 +25,12 @@ export async function POST(_: Request, { params }: { params: Promise<{ id: strin
 
   const { id } = await params;
   const { data: intakeRow } = await supabase
-    .from("case_intake")
-    .select("data")
+    .from("case_intakes")
+    .select("intake")
     .eq("case_id", id)
     .maybeSingle();
 
-  const intake = (intakeRow?.data ?? {}) as any;
+  const intake = (intakeRow?.intake ?? {}) as any;
 
   const { data: existingEvents } = await supabase
     .from("case_events")

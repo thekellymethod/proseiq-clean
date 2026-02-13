@@ -19,7 +19,8 @@ export default async function AccountPage() {
   return (
     <Template
       title="Account"
-      subtitle="Profile, safety settings, configuration, and billing."
+      subtitle="Plan, preferences, and profile."
+      variant="settings"
     >
       <AccountClient
         user={{
@@ -37,6 +38,8 @@ export default async function AccountPage() {
           status: sub?.status ?? null,
           current_period_end: sub?.current_period_end ?? null,
           cancel_at_period_end: sub?.cancel_at_period_end ?? null,
+          price_id: sub?.price_id ?? null,
+          plan: sub?.price_id === process.env.STRIPE_PRICE_ID_PRO ? "pro" : sub?.price_id ? "basic" : null,
         }}
       />
     </Template>

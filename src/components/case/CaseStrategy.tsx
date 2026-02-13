@@ -1,4 +1,3 @@
-//src/components/case/CaseStrategy.tsx
 "use client";
 
 import React from "react";
@@ -7,6 +6,13 @@ function cx(...s: Array<string | false | null | undefined>) {
   return s.filter(Boolean).join(" ");
 }
 
+type StrategyResult = {
+  issues: { title: string; why_it_matters: string }[];
+  evidence_gaps: { gap: string; how_to_fill: string }[];
+  next_actions: { action: string; priority: string }[];
+  risks: { risk: string; mitigation: string }[];
+};
+
 export default function CaseStrategy({
   caseId,
   readOnly,
@@ -14,19 +20,36 @@ export default function CaseStrategy({
   caseId: string;
   readOnly?: boolean;
 }) {
-  const [theory, setTheory] = React.useState(
-    "Defendant violated statutory notice requirements, then leveraged improper fees and reporting to force an unlawful deficiency."
-  );
-  const [goals, setGoals] = React.useState(
-    "1) Immediate relief/settlement leverage\n2) Remove negative reporting\n3) Recover fees and damages\n4) Position for summary disposition"
-  );
-  const [proof, setProof] = React.useState(
-    "- Contract terms\n- Payment ledger + bank records\n- Notice defects\n- Repo invoice\n- Sale irregularities\n- Credit disputes + continued reporting"
-  );
+  const [theory, setTheory] = React.useState("");
+  const [goals, setGoals] = React.useState("");
+  const [proof, setProof] = React.useState("");
+  const [result, setResult] = React.useState<StrategyResult | null>(null);
+  const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
 
-  function save() {
-    // TODO: POST /api/cases/[caseId]/strategy
-    // Keep as local-first for now.
+  async function generate() {
+    const summary = [theory, goals, proof].filter(Boolean).join("\n\n");
+    if (!summary.trim()) {
+      setError("Add theory, goals, or proof map to generate strategy.");
+      return;
+    }
+    setError(null);
+    setResult(null);
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/cases/${caseId}/strategy`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ case_summary: summary }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error((json as { error?: string })?.error ?? "Failed to generate");
+      setResult(json);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Failed to generate");
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -38,10 +61,15 @@ export default function CaseStrategy({
         </p>
       </div>
 
+      {error ? (
+        <div className="mt-3 rounded-lg border border-red-400/30 bg-red-500/10 p-3 text-sm text-red-100">
+          {error}
+        </div>
+      ) : null}
+
       <div className="mt-4 grid gap-4 lg:grid-cols-3">
         <Card title="Theory of the case">
           <textarea
-            title="Theory of the case"
             value={theory}
             onChange={(e) => setTheory(e.target.value)}
             disabled={!!readOnly}
@@ -51,12 +79,12 @@ export default function CaseStrategy({
               "focus:outline-none focus:ring-2 focus:ring-amber-300/30",
               readOnly && "opacity-60"
             )}
+            placeholder="Your legal theory and what you intend to prove."
           />
         </Card>
 
         <Card title="Goals">
           <textarea
-            title="Goals"
             value={goals}
             onChange={(e) => setGoals(e.target.value)}
             disabled={!!readOnly}
@@ -66,13 +94,12 @@ export default function CaseStrategy({
               "focus:outline-none focus:ring-2 focus:ring-amber-300/30",
               readOnly && "opacity-60"
             )}
+            placeholder="Objectives and desired outcomes."
           />
         </Card>
 
         <Card title="Proof map">
           <textarea
-            title="Proof map"
-            placeholder="- Contract terms\n- Payment ledger + bank records\n- Notice defects\n- Repo invoice\n- Sale irregularities\n- Credit disputes + continued reporting"
             value={proof}
             onChange={(e) => setProof(e.target.value)}
             disabled={!!readOnly}
@@ -82,24 +109,80 @@ export default function CaseStrategy({
               "focus:outline-none focus:ring-2 focus:ring-amber-300/30",
               readOnly && "opacity-60"
             )}
+            placeholder="Evidence and documents that support each element."
           />
         </Card>
       </div>
 
-      <div className="mt-4 flex items-center justify-between gap-3">
-        <div className="text-xs text-white/50">
-          Case: <span className="text-white/70">{caseId}</span>
-        </div>
-
-        {!readOnly ? (
+      {!readOnly && (
+        <div className="mt-4">
           <button
-            onClick={save}
-            className="rounded-md border border-amber-300/30 bg-amber-300/10 px-3 py-2 text-sm text-amber-50 hover:bg-amber-300/15"
+            onClick={generate}
+            disabled={loading}
+            className={cx(
+              "rounded-md border border-amber-300/30 bg-amber-300/10 px-4 py-2 text-sm text-amber-50 hover:bg-amber-300/15",
+              loading && "opacity-60"
+            )}
           >
-            Save (wire next)
+            {loading ? "Generating…" : "Generate Strategy"}
           </button>
-        ) : null}
-      </div>
+        </div>
+      )}
+
+      {result && (
+        <div className="mt-6 space-y-4">
+          {result.issues?.length > 0 && (
+            <Card title="Issues">
+              <ul className="mt-2 space-y-2">
+                {result.issues.map((i, idx) => (
+                  <li key={idx} className="rounded-lg border border-white/10 bg-black/20 p-3">
+                    <div className="font-medium text-white">{i.title}</div>
+                    <div className="mt-1 text-sm text-white/70">{i.why_it_matters}</div>
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          )}
+          {result.evidence_gaps?.length > 0 && (
+            <Card title="Evidence gaps">
+              <ul className="mt-2 space-y-2">
+                {result.evidence_gaps.map((g, idx) => (
+                  <li key={idx} className="rounded-lg border border-white/10 bg-black/20 p-3">
+                    <div className="text-white">{g.gap}</div>
+                    <div className="mt-1 text-sm text-white/70">{g.how_to_fill}</div>
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          )}
+          {result.next_actions?.length > 0 && (
+            <Card title="Next actions">
+              <ul className="mt-2 space-y-2">
+                {result.next_actions.map((a, idx) => (
+                  <li key={idx} className="rounded-lg border border-white/10 bg-black/20 p-3">
+                    <div className="text-white">{a.action}</div>
+                    <span className="mt-1 inline-block rounded-full border border-amber-300/30 bg-amber-300/10 px-2 py-0.5 text-xs text-amber-100">
+                      {a.priority}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          )}
+          {result.risks?.length > 0 && (
+            <Card title="Risks">
+              <ul className="mt-2 space-y-2">
+                {result.risks.map((r, idx) => (
+                  <li key={idx} className="rounded-lg border border-white/10 bg-black/20 p-3">
+                    <div className="text-white">{r.risk}</div>
+                    <div className="mt-1 text-sm text-white/70">{r.mitigation}</div>
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          )}
+        </div>
+      )}
     </section>
   );
 }

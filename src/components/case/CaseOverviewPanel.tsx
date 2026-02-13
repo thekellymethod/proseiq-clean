@@ -71,9 +71,6 @@ export default async function CaseOverviewPanel({ caseId }: { caseId: string }) 
               <h3 className="text-white font-semibold">At a glance</h3>
               <p className="mt-1 text-sm text-white/70">Quick status, deadlines, and next steps.</p>
             </div>
-            <div className="text-xs text-white/50">
-              <span className="text-white/70 font-mono">{caseId.slice(0, 8)}</span>
-            </div>
           </div>
 
           <div className="mt-4 grid gap-3 sm:grid-cols-2">

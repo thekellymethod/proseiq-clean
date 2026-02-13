@@ -1,15 +1,34 @@
-//src/components/case/ProactiveCaseLaw.jsx
-import React, { useState, useEffect } from 'react';
+"use client";
+
+import React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Sparkles, BookOpen, Loader2, Plus, RefreshCw } from 'lucide-react';
+import { Sparkles, BookOpen, Loader2, Plus, RefreshCw } from "lucide-react";
 
-export default function ProactiveCaseLaw({ caseData }) {
-  const [suggestions, setSuggestions] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [pinned, setPinned] = useState([]);
+type CaseData = {
+  id: string;
+  title?: string;
+  case_type?: string;
+  status?: string;
+  our_position?: string;
+  key_facts?: string[];
+  legal_issues?: string[];
+  description?: string;
+};
+
+type Suggestion = {
+  citation?: string;
+  holding?: string;
+  relevance?: string;
+  strength?: string;
+};
+
+export default function ProactiveCaseLaw({ caseData }: { caseData: CaseData }) {
+  const [suggestions, setSuggestions] = React.useState<Suggestion[] | null>(null);
+  const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+  const [pinned, setPinned] = React.useState<Suggestion[]>([]);
 
   const generateSuggestions = async () => {
     setLoading(true);
@@ -20,10 +39,10 @@ export default function ProactiveCaseLaw({ caseData }) {
 CASE: ${caseData.title}
 TYPE: ${caseData.case_type}
 STATUS: ${caseData.status}
-POSITION: ${caseData.our_position || 'Not specified'}
-KEY FACTS: ${caseData.key_facts?.join(', ') || 'None listed'}
-LEGAL ISSUES: ${caseData.legal_issues?.join(', ') || 'None listed'}
-DESCRIPTION: ${caseData.description || 'N/A'}
+POSITION: ${caseData.our_position || "Not specified"}
+KEY FACTS: ${caseData.key_facts?.join(", ") || "None listed"}
+LEGAL ISSUES: ${caseData.legal_issues?.join(", ") || "None listed"}
+DESCRIPTION: ${caseData.description || "N/A"}
 
 Provide 5 relevant case law suggestions with:
 - Full citation
@@ -41,30 +60,30 @@ Provide 5 relevant case law suggestions with:
         }),
       });
       const j = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(j?.error || `Request failed (${res.status})`);
+      if (!res.ok) throw new Error((j as { error?: string })?.error || `Request failed (${res.status})`);
 
-      const result = j?.json || {};
+      const result = (j as { json?: { suggestions?: Suggestion[] } })?.json || {};
       setSuggestions(result.suggestions || []);
     } catch (e) {
-      setError(e?.message || "Failed to generate suggestions.");
+      setError(e instanceof Error ? e.message : "Failed to generate suggestions.");
       setSuggestions([]);
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
+  React.useEffect(() => {
     generateSuggestions();
   }, []);
 
-  const strengthColors = {
-    high: 'bg-green-100 text-green-700',
-    medium: 'bg-amber-100 text-amber-700',
-    low: 'bg-slate-100 text-slate-600'
+  const strengthColors: Record<string, string> = {
+    high: "bg-green-100 text-green-700",
+    medium: "bg-amber-100 text-amber-700",
+    low: "bg-slate-100 text-slate-600",
   };
 
-  const addToCaseLibrary = async (suggestion) => {
-    // TODO: persist to DB once a CaseLaw table + API exists.
+  const addToCaseLibrary = (suggestion: Suggestion) => {
+    // Uses local state for now; can be wired to case_ai_outputs or dedicated case_law table later.
     setPinned((p) => {
       if (p.some((x) => x.citation === suggestion.citation)) return p;
       return [...p, suggestion];
@@ -79,12 +98,7 @@ Provide 5 relevant case law suggestions with:
             <Sparkles className="w-5 h-5 text-amber-500" />
             AI-Suggested Case Law
           </CardTitle>
-          <Button 
-            variant="outline" 
-            size="sm"
-            onClick={generateSuggestions}
-            disabled={loading}
-          >
+          <Button variant="outline" size="sm" onClick={generateSuggestions} disabled={loading}>
             {loading ? (
               <Loader2 className="w-4 h-4 animate-spin" />
             ) : (
@@ -104,7 +118,7 @@ Provide 5 relevant case law suggestions with:
             <Loader2 className="w-8 h-8 animate-spin mx-auto mb-2" />
             <p>Analyzing case and researching relevant precedents...</p>
           </div>
-        ) : suggestions?.length > 0 ? (
+        ) : suggestions && suggestions.length > 0 ? (
           <div className="space-y-4">
             {suggestions.map((suggestion, i) => (
               <div key={i} className="bg-slate-50 rounded-lg p-4 hover:bg-slate-100 transition-colors">
@@ -113,7 +127,7 @@ Provide 5 relevant case law suggestions with:
                     <div className="flex items-center gap-2 mb-2">
                       <BookOpen className="w-4 h-4 text-blue-500" />
                       <h4 className="font-semibold text-slate-900 text-sm">{suggestion.citation}</h4>
-                      <Badge className={strengthColors[suggestion.strength?.toLowerCase() || 'medium']}>
+                      <Badge className={strengthColors[suggestion.strength?.toLowerCase() || "medium"]}>
                         {suggestion.strength}
                       </Badge>
                     </div>
@@ -124,8 +138,8 @@ Provide 5 relevant case law suggestions with:
                       <span className="font-medium">Relevance:</span> {suggestion.relevance}
                     </p>
                   </div>
-                  <Button 
-                    size="sm" 
+                  <Button
+                    size="sm"
                     variant="outline"
                     onClick={() => addToCaseLibrary(suggestion)}
                     className="flex-shrink-0"
@@ -137,9 +151,9 @@ Provide 5 relevant case law suggestions with:
               </div>
             ))}
 
-            {pinned?.length ? (
+            {pinned.length > 0 ? (
               <div className="pt-2">
-                <div className="text-xs font-medium text-slate-600 mb-2">Pinned (local)</div>
+                <div className="text-xs font-medium text-slate-600 mb-2">Pinned (session)</div>
                 <ul className="space-y-1">
                   {pinned.map((p, idx) => (
                     <li key={idx} className="text-xs text-slate-700">

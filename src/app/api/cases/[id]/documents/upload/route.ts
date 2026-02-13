@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
+import { getPlanForUser } from "@/lib/billing/plan";
 
 async function enqueueJob(supabase: any, userId: string, opts: { caseId: string; jobType: string; sourceType?: string; sourceId?: string; payload?: any }) {
   await supabase.from("case_ai_jobs").insert({
@@ -33,6 +34,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (!user) return res;
 
   const { id } = await params;
+
+  // Verify case ownership
+  const { data: c } = await supabase.from("cases").select("id").eq("id", id).eq("created_by", user.id).maybeSingle();
+  if (!c) return bad("Not found", 404);
+
   const body = await req.json().catch(() => ({}));
   const filenameRaw = String(body?.filename ?? "").trim();
   const mimeType = String(body?.mime_type ?? body?.mimeType ?? "").trim() || "application/octet-stream";
@@ -62,17 +68,20 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   if (rowErr) return bad(rowErr.message, 400);
 
-  // Best-effort enqueue for proactive analysis (document added).
-  try {
-    await enqueueJob(supabase, user.id, {
-      caseId: id,
-      jobType: "document_added",
-      sourceType: "documents",
-      sourceId: row.id,
-      payload: { filename: row.filename, mime_type: row.mime_type, kind: row.kind },
-    });
-  } catch {
-    // ignore
+  // Best-effort enqueue for proactive analysis (document added, Pro only).
+  const plan = await getPlanForUser();
+  if (plan === "pro") {
+    try {
+      await enqueueJob(supabase, user.id, {
+        caseId: id,
+        jobType: "document_added",
+        sourceType: "documents",
+        sourceId: row.id,
+        payload: { filename: row.filename, mime_type: row.mime_type, kind: row.kind },
+      });
+    } catch {
+      // ignore
+    }
   }
 
   const { data, error } = await supabase.storage.from(bucket).createSignedUploadUrl(objectPath);

@@ -43,17 +43,38 @@ export async function POST(req: Request) {
 
   const files: { name: string; data: Uint8Array }[] = [];
   const enc = new TextEncoder();
-  files.push({ name: "manifest.json", data: enc.encode(JSON.stringify(bundle.manifest ?? {}, null, 2)) });
+  const manifest = bundle.manifest ?? {};
+  const exhibitIds: string[] = Array.isArray(manifest.exhibit_ids) ? manifest.exhibit_ids : [];
+  const include: string[] = Array.isArray(manifest.include) ? manifest.include : ["documents", "exhibits", "drafts"];
 
-  const include: string[] = Array.isArray(bundle.manifest?.include) ? bundle.manifest.include : ["documents", "exhibits", "drafts"];
+  files.push({ name: "manifest.json", data: enc.encode(JSON.stringify(manifest, null, 2)) });
 
-  // Documents
+  // When exhibit_ids present: include only documents attached to those exhibits
+  let docIdsToInclude: string[] | null = null;
+  if (exhibitIds.length > 0) {
+    const { data: attachRows } = await supabase
+      .from("case_exhibit_documents")
+      .select("document_id")
+      .in("exhibit_id", exhibitIds);
+    docIdsToInclude = [...new Set((attachRows ?? []).map((r) => r.document_id))];
+  }
+
+  // Documents (app uses "documents" table)
   if (include.includes("documents")) {
-    const { data: docs } = await supabase
-      .from("case_documents")
+    let query = supabase
+      .from("documents")
       .select("id,filename,storage_bucket,storage_path,status")
       .eq("case_id", bundle.case_id)
+      .eq("created_by", user.id)
       .order("created_at", { ascending: true });
+    if (docIdsToInclude !== null) {
+      if (docIdsToInclude.length === 0) {
+        // No attached docs - skip documents section
+      } else {
+        query = query.in("id", docIdsToInclude);
+      }
+    }
+    const { data: docs } = docIdsToInclude?.length === 0 ? { data: [] } : await query;
 
     for (const d of docs ?? []) {
       if (!d.storage_bucket || !d.storage_path) continue;
@@ -65,15 +86,35 @@ export async function POST(req: Request) {
     }
   }
 
-  // Exhibits list (no stamping here)
+  // Exhibits list (scoped by exhibit_ids when present)
   if (include.includes("exhibits")) {
-    const { data: exhibits } = await supabase
+    let exhibitsQuery = supabase
       .from("case_exhibits")
-      .select("id,exhibit_index,exhibit_label,title,description")
+      .select("id,exhibit_no,label,title,description,exhibit_index,exhibit_label")
       .eq("case_id", bundle.case_id)
-      .order("exhibit_index", { ascending: true });
+      .order("sort_order", { ascending: true })
+      .order("exhibit_no", { ascending: true, nullsFirst: false });
+    if (exhibitIds.length > 0) {
+      exhibitsQuery = exhibitsQuery.in("id", exhibitIds);
+    }
+    const { data: exhibits } = await exhibitsQuery;
 
-    files.push({ name: "exhibits.json", data: enc.encode(JSON.stringify(exhibits ?? [], null, 2)) });
+    const mapped = (exhibits ?? []).map((e) => ({
+      id: e.id,
+      exhibit_no: e.exhibit_no ?? e.exhibit_index,
+      label: e.label ?? e.exhibit_label ?? `Exhibit ${e.exhibit_no ?? e.exhibit_index}`,
+      title: e.title,
+      description: e.description ?? null,
+    }));
+    const sorted =
+      exhibitIds.length > 0
+        ? [...mapped].sort((a, b) => {
+            const ai = exhibitIds.indexOf(a.id);
+            const bi = exhibitIds.indexOf(b.id);
+            return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+          })
+        : mapped;
+    files.push({ name: "exhibits.json", data: enc.encode(JSON.stringify(sorted, null, 2)) });
   }
 
   // Drafts (plain text)

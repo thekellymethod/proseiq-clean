@@ -12,6 +12,39 @@ function bad(message: string, status = 400) {
   return NextResponse.json({ error: message }, { status });
 }
 
+export async function GET(_: Request, { params }: { params: Promise<{ id: string; exhibitId: string }> }) {
+  const { supabase, user, res } = await requireUser();
+  if (!user) return res;
+
+  const { id, exhibitId } = await params;
+
+  const { data: ex } = await supabase
+    .from("case_exhibits")
+    .select("id")
+    .eq("case_id", id)
+    .eq("id", exhibitId)
+    .maybeSingle();
+  if (!ex) return bad("Exhibit not found", 404);
+
+  const { data: rows, error } = await supabase
+    .from("case_exhibit_documents")
+    .select("document_id")
+    .eq("exhibit_id", exhibitId);
+  if (error) return bad(error.message, 400);
+
+  const docIds = (rows ?? []).map((r) => r.document_id);
+  if (docIds.length === 0) return NextResponse.json({ items: [] });
+
+  const { data: docs, error: docErr } = await supabase
+    .from("documents")
+    .select("id,filename,storage_bucket,storage_path,status")
+    .eq("case_id", id)
+    .in("id", docIds);
+  if (docErr) return bad(docErr.message, 400);
+
+  return NextResponse.json({ items: docs ?? [] });
+}
+
 export async function POST(req: Request, { params }: { params: Promise<{ id: string; exhibitId: string }> }) {
   const { supabase, user, res } = await requireUser();
   if (!user) return res;
@@ -31,10 +64,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (!ex) return bad("Exhibit not found", 404);
 
   const { data: doc, error: docErr } = await supabase
-    .from("case_documents")
+    .from("documents")
     .select("id")
     .eq("case_id", id)
     .eq("id", docId)
+    .eq("created_by", user.id)
     .maybeSingle();
   if (docErr) return bad(docErr.message, 400);
   if (!doc) return bad("Document not found", 404);

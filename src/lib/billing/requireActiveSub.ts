@@ -1,5 +1,6 @@
 import { createClient } from "@/utils/supabase/server";
 import { NextResponse } from "next/server";
+import { isProPlan } from "./plan";
 
 export async function requireActiveSubscription() {
   const supabase = await createClient();
@@ -10,7 +11,7 @@ export async function requireActiveSubscription() {
 
   const { data: sub } = await supabase
     .from("billing_subscriptions")
-    .select("status")
+    .select("status, price_id")
     .eq("user_id", auth.user.id)
     .order("updated_at", { ascending: false })
     .limit(1)
@@ -25,5 +26,26 @@ export async function requireActiveSubscription() {
     };
   }
 
-  return { supabase, user: auth.user, res: null };
+  return {
+    supabase,
+    user: auth.user,
+    res: null,
+    plan: isProPlan(sub?.price_id) ? "pro" : "basic",
+  };
+}
+
+/** For Pro-only API routes. Returns 402 if user is not on Pro plan. */
+export async function requireProPlan() {
+  const result = await requireActiveSubscription();
+  if (result.res) return result;
+  if (result.plan !== "pro") {
+    return {
+      ...result,
+      res: NextResponse.json(
+        { error: "Pro plan required. Upgrade to access Research, AI Assistant, and 3D Timeline." },
+        { status: 402 }
+      ),
+    };
+  }
+  return result;
 }

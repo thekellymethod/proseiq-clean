@@ -75,7 +75,7 @@ export const ALL_QUESTIONS: GuidedQuestion[] = [
     subtext: "e.g., District Court, County Court, or Federal District Court",
     inputType: "text",
     field: "basics.court",
-    placeholder: "e.g., 44th District Court, Dallas County",
+    placeholder: "e.g., County District Court",
   },
   {
     id: "plaintiff_name",
@@ -83,14 +83,14 @@ export const ALL_QUESTIONS: GuidedQuestion[] = [
     subtext: "The case title will be formatted as Plaintiff v. Defendant (or Petitioner v. Respondent).",
     inputType: "text",
     field: "basics.plaintiffName",
-    placeholder: "e.g., Jane Kelly",
+    placeholder: "e.g., Plaintiff name",
   },
   {
     id: "defendant_name",
     text: "Defendant or Respondent name",
     inputType: "text",
     field: "basics.defendantName",
-    placeholder: "e.g., Public Storage",
+    placeholder: "e.g., Defendant name",
   },
   {
     id: "description",

@@ -1,13 +1,6 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/utils/supabase/server";
 import { z } from "zod";
-
-async function requireUser() {
-  const supabase = await createClient();
-  const { data: auth } = await supabase.auth.getUser();
-  if (!auth?.user) return { supabase, user: null, res: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
-  return { supabase, user: auth.user, res: null as any };
-}
+import { requireProPlan } from "@/lib/billing/requireActiveSub";
 
 function bad(message: string, status = 400) {
   return NextResponse.json({ error: message }, { status });
@@ -19,8 +12,8 @@ const BodySchema = z.object({
 });
 
 export async function GET(_: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { supabase, user, res } = await requireUser();
-  if (!user) return res;
+  const { supabase, user, res } = await requireProPlan();
+  if (res) return res;
 
   const { id: caseId } = await params;
 
@@ -41,8 +34,8 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
 }
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { supabase, user, res } = await requireUser();
-  if (!user) return res;
+  const { supabase, user, res } = await requireProPlan();
+  if (res) return res;
 
   const { id: caseId } = await params;
   const bodyRaw = await req.json().catch(() => ({}));

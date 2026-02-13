@@ -7,10 +7,9 @@ export default function BackgroundFX() {
         style={{
           background:
             `
-            radial-gradient(1400px 900px at 18% -12%, rgba(251,191,36,0.42), transparent 55%),
-            radial-gradient(1100px 800px at 82% -6%, rgba(56,189,248,0.34), transparent 58%),
-            radial-gradient(900px 700px at 75% 85%, rgba(168,85,247,0.26), transparent 60%),
-            radial-gradient(800px 600px at 12% 75%, rgba(34,197,94,0.18), transparent 55%),
+            radial-gradient(1400px 900px at 18% -12%, rgba(251,191,36,0.24), transparent 55%),
+            radial-gradient(1100px 800px at 82% -6%, rgba(56,189,248,0.18), transparent 58%),
+            radial-gradient(900px 700px at 75% 85%, rgba(168,85,247,0.12), transparent 60%),
             linear-gradient(to bottom, #020203 0%, #070812 45%, #090914 100%)
             `,
         }}

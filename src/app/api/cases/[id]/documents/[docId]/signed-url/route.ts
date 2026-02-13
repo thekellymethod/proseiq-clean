@@ -20,11 +20,16 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   const url = new URL(req.url);
   const expiresIn = Math.min(Math.max(Number(url.searchParams.get("expiresIn") ?? 900), 60), 7 * 24 * 3600);
 
+  // Verify case ownership and fetch document
+  const { data: c } = await supabase.from("cases").select("id").eq("id", id).eq("created_by", user.id).maybeSingle();
+  if (!c) return bad("Not found", 404);
+
   const { data: doc, error } = await supabase
     .from("documents")
     .select("id,storage_bucket,storage_path,filename,mime_type")
     .eq("case_id", id)
     .eq("id", docId)
+    .eq("created_by", user.id)
     .maybeSingle();
 
   if (error) return bad(error.message, 400);

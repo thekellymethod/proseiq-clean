@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
+import { getPlanForUser } from "@/lib/billing/plan";
 
 async function enqueueJob(supabase: any, userId: string, opts: { caseId: string; jobType: string; sourceType?: string; sourceId?: string; payload?: any }) {
   await supabase.from("case_ai_jobs").insert({
@@ -62,17 +63,20 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
 
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
 
-  // Best-effort enqueue for proactive analysis.
-  try {
-    await enqueueJob(supabase, auth.user.id, {
-      caseId,
-      jobType: "event_created",
-      sourceType: "case_events",
-      sourceId: data.id,
-      payload: { event: data },
-    });
-  } catch {
-    // ignore enqueue failures; core CRUD must succeed
+  // Best-effort enqueue for proactive analysis (Pro only).
+  const plan = await getPlanForUser();
+  if (plan === "pro") {
+    try {
+      await enqueueJob(supabase, auth.user.id, {
+        caseId,
+        jobType: "event_created",
+        sourceType: "case_events",
+        sourceId: data.id,
+        payload: { event: data },
+      });
+    } catch {
+      // ignore enqueue failures; core CRUD must succeed
+    }
   }
 
   return NextResponse.json({ item: data });

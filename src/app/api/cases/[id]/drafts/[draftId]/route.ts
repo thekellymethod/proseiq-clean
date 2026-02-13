@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
+import { getPlanForUser } from "@/lib/billing/plan";
 
 async function enqueueJob(supabase: any, userId: string, opts: { caseId: string; jobType: string; sourceType?: string; sourceId?: string; payload?: any }) {
   await supabase.from("case_ai_jobs").insert({
@@ -86,17 +87,20 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
   if (error) return bad(error.message, 400);
 
-  // Best-effort enqueue for proactive analysis (draft saved).
-  try {
-    await enqueueJob(supabase, user.id, {
-      caseId: id,
-      jobType: "draft_saved",
-      sourceType: "case_drafts",
-      sourceId: draftId,
-      payload: { title: data.title, kind: data.kind, status: data.status },
-    });
-  } catch {
-    // ignore
+  // Best-effort enqueue for proactive analysis (draft saved, Pro only).
+  const plan = await getPlanForUser();
+  if (plan === "pro") {
+    try {
+      await enqueueJob(supabase, user.id, {
+        caseId: id,
+        jobType: "draft_saved",
+        sourceType: "case_drafts",
+        sourceId: draftId,
+        payload: { title: data.title, kind: data.kind, status: data.status },
+      });
+    } catch {
+      // ignore
+    }
   }
 
   return NextResponse.json({ item: data });

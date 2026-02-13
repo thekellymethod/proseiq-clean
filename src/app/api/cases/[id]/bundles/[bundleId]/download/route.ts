@@ -19,7 +19,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   const { id, bundleId } = await params;
   const { data: bundle, error } = await supabase
     .from("case_bundles")
-    .select("id,status,output_path,title")
+    .select("id,status,storage_bucket,storage_path,output_path,title")
     .eq("case_id", id)
     .eq("id", bundleId)
     .maybeSingle();
@@ -27,14 +27,14 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   if (error) return bad(error.message, 400);
   if (!bundle) return bad("Not found", 404);
 
-  if (bundle.status !== "ready" || !bundle.output_path) {
+  const bucket = bundle.storage_bucket || "case-files";
+  const path = bundle.storage_path || bundle.output_path;
+
+  if (bundle.status !== "ready" || !path) {
     return bad("Bundle not ready. Process it first.", 409);
   }
 
-  // NOTE: this project currently stores bundle output path without a bucket;
-  // assume the default case-files bucket for download.
-  const bucket = "case-files";
-  const { data: blob, error: dlErr } = await supabase.storage.from(bucket).download(bundle.output_path);
+  const { data: blob, error: dlErr } = await supabase.storage.from(bucket).download(path);
   if (dlErr) return bad(dlErr.message, 400);
   if (!blob) return bad("Bundle not found", 404);
 

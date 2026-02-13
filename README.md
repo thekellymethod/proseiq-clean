@@ -17,6 +17,23 @@ ProseIQ keeps case materials in one place and (optionally) adds an AI “first�
 
 ### What it offers
 
+### Plans & features
+
+| Feature                               | Basic ($29/mo) | Pro ($59/mo) |
+|---------|----------------|--------------|
+| Case workspace                                    | ✓ | ✓  |
+| Events timeline                                   | ✓ | ✓  |
+| 3D timeline view                                  | —  | ✓ |
+| Documents (upload, view, download)````            | ✓ | ✓ |
+| Exhibits (create, sequence, attach)               | ✓ | ✓ |
+| Drafts (rich editor, templates, signatures)       | ✓ | ✓ |
+| Export (PDF/DOCX)                                 | ✓ | ✓ |
+| Bundles                                           | ✓ | ✓ |
+| Tasks / status                                    | ✓ | ✓ |
+| Legal research (web search, pin authority)        | — | ✓ |
+| AI Assistant (proactive analysis)                 | — | ✓ |
+| Coaching tools (witness, cross-exam, subpoena, motions) | — | ✓ |
+
 ### Feature matrix (at a glance)
 
 | Area | What you can do | Key outputs |
@@ -28,24 +45,24 @@ ProseIQ keeps case materials in one place and (optionally) adds an AI “first�
 | **Drafts** | Write motions/letters with templates; rich editor; signatures | Draft content (JSON + plain text) |
 | **Export** | Export drafts as PDF/DOCX (court-style formatting) | Shareable filing-ready docs |
 | **Bundles** | Generate compiled case bundles | Bundle files in Storage |
-| **Research (optional)** | Search web sources + extract structured hits + pin authority | Pinned “authority” library |
-| **Assistant (optional)** | Proactive analysis + coaching tools | Action plans, checklists, structured JSON |
+| **Research** (Pro) | Search web sources + extract structured hits + pin authority | Pinned “authority” library |
+| **Assistant** (Pro) | Proactive analysis + coaching tools | Action plans, checklists, structured JSON |
 
-#### Case workspace (core)
+#### Case workspace (Basic & Pro)
 
 - **Cases**: each case has a workspace with tabs for the major workflows.
 - **Events timeline**: track procedural history, deadlines, hearings, filings, evidence milestones.
-  - Includes a **3D timeline view** (optional) for visualizing events by date/kind.
+  - **3D timeline view** (Pro): visualize events by date/kind in an interactive 3D view.
 - **Tasks / status**: lightweight operational tracking for the case.
 
-#### Documents + exhibits
+#### Documents + exhibits (Basic & Pro)
 
 - **Documents**: upload PDFs and other evidence into Supabase Storage (`case-documents`).
 - **Viewer**: in-app document viewer for PDFs.
 - **Download**: reliable server-side download redirect (no popup blockers).
 - **Exhibits**: create and sequence exhibits and attach uploaded documents as needed.
 
-#### Drafting (rich editor + templates)
+#### Drafting (Basic & Pro)
 
 - **Drafts**: create and manage case drafts (motions, declarations, notices, letters).
 - **Rich editor**: WYSIWYG-ish editor backed by structured JSON content (Tiptap / ProseMirror).
@@ -53,21 +70,21 @@ ProseIQ keeps case materials in one place and (optionally) adds an AI “first�
 - **Signature support**: upload a signature image and include it in exports.
 - **Save UX**: back button + “unsaved changes” indicator + save shortcuts.
 
-#### Export / bundling
+#### Export / bundling (Basic & Pro)
 
 - **PDF export** for drafts (court-style formatting).
 - **DOCX export** for drafts (court-style formatting + optional embedded signature image).
 - **Bundles**: generate case bundles and download compiled outputs (stored in `case-files`).
 
-#### Legal research (optional)
+#### Legal research (Pro only)
 
 - **Research search**: query the web (via Serper) and extract structured “authority hits”.
 - **Pinning**: pin “authority” items to a case for later use and citation tracking.
 - **Audit trail**: AI outputs are stored with metadata for reproducibility.
 
-#### AI Assistant (optional)
+#### AI Assistant (Pro only)
 
-When configured (via `OPENAI_API_KEY`, optionally `SERPER_API_KEY`), ProseIQ provides:
+When configured (via `OPENAI_API_KEY`, optionally `SERPER_API_KEY`), Pro accounts get:
 
 - **Proactive analysis pipeline**: when a user adds/updates key case artifacts (events, intake, documents, drafts), ProseIQ can enqueue background jobs that produce:
   - relevance / importance signals
@@ -158,6 +175,7 @@ Create `.env.local` (or `.env`) with:
 ```bash
 NEXT_PUBLIC_SUPABASE_URL=...
 NEXT_PUBLIC_SUPABASE_ANON_KEY=...
+NEXT_PUBLIC_APP_URL=http://localhost:3000
 ```
 
 Optional (for AI assistant + research):
@@ -167,6 +185,18 @@ OPENAI_API_KEY=...
 SERPER_API_KEY=...
 OPENAI_MODEL=gpt-4o-mini
 ```
+
+Billing (Stripe):
+
+```bash
+STRIPE_SECRET_KEY=sk_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+STRIPE_PRICE_ID_BASIC=price_...   # $29/mo
+STRIPE_PRICE_ID_PRO=price_...     # $59/mo
+SUPABASE_SERVICE_ROLE_KEY=...     # required for webhook
+```
+
+See `BILLING_SETUP.md` for full billing setup.
 
 ### Install
 
@@ -212,9 +242,25 @@ If Storage upload/download isn’t working, confirm the buckets exist and the po
 
 ## Documents: upload, view, download
 
-- **Upload**: uses Supabase Storage signed uploads.
-- **Download**: `GET /api/cases/[id]/documents/[docId]/download` redirects to a signed URL with a `download` hint so PDFs download reliably.
+- **Upload**: uses Supabase Storage signed uploads. Supports PDFs, images, and common document types.
+- **Download**: `GET /api/cases/[id]/documents/[docId]/download` streams the file with `Content-Disposition: attachment` for reliable download.
 - **Viewer**: `GET /dashboard/cases/[id]/documents/[docId]` shows an in-app viewer (PDFs render in an `<iframe>`).
+
+## Billing
+
+ProseIQ supports two subscription plans via Stripe:
+
+| Plan   | Price   | Includes |
+|--------|---------|----------|
+| Basic  | $29/mo  | Case workspace, events, documents, exhibits, drafts, export, bundles, tasks |
+| Pro    | $59/mo  | Everything in Basic + 3D timeline, legal research, AI Assistant, coaching tools |
+
+- **Checkout**: `POST /api/billing/checkout` with `{ plan: "basic" | "pro" }`
+- **Portal**: `POST /api/billing/portal` for managing/canceling
+- **Webhook**: `POST /api/billing/webhook` receives Stripe events and updates Supabase
+- **Pro gating**: Use `isProPlan(price_id)` from `@/lib/billing/plan` to allow pro-only features
+
+See `BILLING_SETUP.md` for setup steps.
 
 ## Scripts
 

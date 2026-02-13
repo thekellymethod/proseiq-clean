@@ -1,6 +1,10 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/cases";
 import CaseFocusPanel from "@/components/case/CaseFocusPanel";
+import AnalysisLegalAuthorities from "@/components/case/AnalysisLegalAuthorities";
+import AnalysisElementsSatisfied from "@/components/case/AnalysisElementsSatisfied";
+import AnalysisStatuteOfLimitations from "@/components/case/AnalysisStatuteOfLimitations";
+import AnalysisJurisdiction from "@/components/case/AnalysisJurisdiction";
 
 function fmt(iso: string) {
   try {
@@ -18,7 +22,7 @@ export default async function CaseAnalysisPanel({ caseId }: { caseId: string }) 
   const { supabase, user } = await requireUser();
   const nowIso = new Date().toISOString();
 
-  const [intakeRow, overdueDeadlines, upcomingDeadlines, openTasks, drafts, bundles, focusOutputs, queuedJobs] = await Promise.all([
+  const [intakeRow, overdueDeadlines, upcomingDeadlines, openTasks, drafts, bundles, focusOutputs, queuedJobs, pinnedResearch] = await Promise.all([
     supabase.from("case_intakes").select("case_id,intake,updated_at,created_at").eq("case_id", caseId).maybeSingle(),
     supabase
       .from("case_events")
@@ -71,7 +75,21 @@ export default async function CaseAnalysisPanel({ caseId }: { caseId: string }) 
       .eq("created_by", user.id)
       .eq("status", "queued")
       .limit(50),
+    supabase
+      .from("case_ai_outputs")
+      .select("content")
+      .eq("case_id", caseId)
+      .eq("created_by", user.id)
+      .eq("output_type", "research_hit")
+      .eq("pinned", true)
+      .order("updated_at", { ascending: false })
+      .limit(50),
   ]);
+
+  const pinnedItems = (pinnedResearch.data ?? []).map((r: any) => {
+    const c = r.content ?? {};
+    return { citation: c.citation, title: c.title, summary: c.summary, relevance: c.relevance };
+  });
 
   const intake = (intakeRow.data as any)?.intake ?? {};
   const intakeKeys = Object.keys(intake ?? {});
@@ -97,6 +115,14 @@ export default async function CaseAnalysisPanel({ caseId }: { caseId: string }) 
           queuedJobs={(queuedJobs.data ?? []).length}
           outputs={(focusOutputs.data ?? []) as any}
         />
+
+        <AnalysisLegalAuthorities caseId={caseId} items={pinnedItems} />
+        <AnalysisElementsSatisfied
+          elementsSatisfied={(focusOutputs.data?.[0] as any)?.content?.elementsSatisfied}
+          elementsChecklist={(focusOutputs.data?.[0] as any)?.content?.elementsChecklist}
+        />
+        <AnalysisStatuteOfLimitations caseId={caseId} intake={intake} />
+        <AnalysisJurisdiction intake={intake} />
 
         <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
           <h3 className="text-white font-semibold">Case health</h3>

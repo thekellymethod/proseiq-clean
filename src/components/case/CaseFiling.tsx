@@ -1,16 +1,8 @@
-//src/components/case/CaseFiling.tsx
 "use client";
 
 import React from "react";
-
-type Filing = {
-  id: string;
-  title: string;
-  filed_on?: string;
-  court?: string;
-  status: "draft" | "filed" | "served" | "rejected";
-  notes?: string;
-};
+import { listFilings, createFiling, updateFiling, deleteFiling } from "@/lib/filings/client";
+import type { Filing, FilingStatus } from "@/lib/filings/types";
 
 function cx(...s: Array<string | false | null | undefined>) {
   return s.filter(Boolean).join(" ");
@@ -28,64 +20,66 @@ export default function CaseFiling({
   const [error, setError] = React.useState<string | null>(null);
 
   const [title, setTitle] = React.useState("");
-  const [court, setCourt] = React.useState("Dallas County District Court");
-  const [status, setStatus] = React.useState<Filing["status"]>("draft");
+  const [court, setCourt] = React.useState("");
+  const [status, setStatus] = React.useState<FilingStatus>("draft");
+
+  const [editingId, setEditingId] = React.useState<string | null>(null);
+  const [editStatus, setEditStatus] = React.useState<FilingStatus>("draft");
 
   async function load() {
     setLoading(true);
     setError(null);
-
     try {
-      // TODO: GET /api/cases/[caseId]/filings
-      setItems([
-        {
-          id: "fil_1",
-          title: "Original Petition",
-          status: "draft",
-          court: "Dallas County District Court",
-          notes: "Draft ready for final verification and signature block.",
-        },
-        {
-          id: "fil_2",
-          title: "Rule 194 Disclosures",
-          status: "filed",
-          filed_on: new Date().toISOString(),
-          court: "Dallas County District Court",
-        },
-      ]);
-    } catch (e: any) {
-      setError(e?.message || "Failed to load filings.");
+      const { filings } = await listFilings(caseId);
+      setItems(filings ?? []);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Failed to load filings.");
     } finally {
       setLoading(false);
     }
   }
 
   async function add() {
-    setError(null);
     const t = title.trim();
     if (!t) return;
-
-    const next: Filing = {
-      id: `fil_${Math.random().toString(16).slice(2)}`,
-      title: t,
-      court: court.trim() || undefined,
-      status,
-    };
-
-    setItems((prev) => [next, ...prev]);
-    setTitle("");
-
+    setError(null);
     try {
-      // TODO: POST /api/cases/[caseId]/filings
-    } catch (e: any) {
-      setError(e?.message || "Failed to save filing.");
-      setItems((prev) => prev.filter((x) => x.id !== next.id));
+      const { filing } = await createFiling(caseId, {
+        title: t,
+        court: court.trim() || null,
+        status,
+      });
+      setItems((prev) => [filing, ...prev]);
+      setTitle("");
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Failed to save filing.");
+    }
+  }
+
+  async function updateStatus(f: Filing, newStatus: FilingStatus) {
+    setError(null);
+    try {
+      const { filing } = await updateFiling(caseId, f.id, { status: newStatus });
+      setItems((prev) => prev.map((x) => (x.id === filing.id ? filing : x)));
+      setEditingId(null);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Failed to update filing.");
+    }
+  }
+
+  async function remove(f: Filing) {
+    if (!confirm("Delete this filing?")) return;
+    setError(null);
+    try {
+      await deleteFiling(caseId, f.id);
+      setItems((prev) => prev.filter((x) => x.id !== f.id));
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Failed to delete filing.");
     }
   }
 
   React.useEffect(() => {
     load();
- 
   }, [caseId]);
 
   return (
@@ -105,14 +99,16 @@ export default function CaseFiling({
         </button>
       </div>
 
+      {error ? (
+        <div className="mt-3 rounded-lg border border-red-400/30 bg-red-500/10 p-3 text-sm text-red-100">
+          {error}
+        </div>
+      ) : null}
+
       <div className="mt-4 grid gap-4 lg:grid-cols-3">
         <div className="lg:col-span-2">
           {loading ? (
             <div className="text-sm text-white/70">Loading…</div>
-          ) : error ? (
-            <div className="rounded-lg border border-red-400/30 bg-red-500/10 p-3 text-sm text-red-100">
-              {error}
-            </div>
           ) : items.length === 0 ? (
             <div className="text-sm text-white/70">No filings yet.</div>
           ) : (
@@ -120,7 +116,7 @@ export default function CaseFiling({
               {items.map((f) => (
                 <li key={f.id} className="rounded-lg border border-white/10 bg-black/10 p-3">
                   <div className="flex items-center justify-between gap-3">
-                    <div className="min-w-0">
+                    <div className="min-w-0 flex-1">
                       <div className="truncate font-medium text-white">{f.title}</div>
                       <div className="mt-1 text-xs text-white/60">
                         {(f.court ?? "—")} •{" "}
@@ -128,9 +124,60 @@ export default function CaseFiling({
                       </div>
                       {f.notes ? <div className="mt-2 text-sm text-white/80">{f.notes}</div> : null}
                     </div>
-                    <span className="shrink-0 rounded-full border border-amber-300/30 bg-amber-300/10 px-2 py-1 text-xs text-amber-50">
-                      {f.status}
-                    </span>
+                    <div className="flex shrink-0 items-center gap-2">
+                      {editingId === f.id ? (
+                        <>
+                          <select
+                            value={editStatus}
+                            onChange={(e) => setEditStatus(e.target.value as FilingStatus)}
+                            className="rounded-md border border-white/10 bg-black/20 px-2 py-1 text-xs text-white"
+                          >
+                            <option value="draft">draft</option>
+                            <option value="prepared">prepared</option>
+                            <option value="filed">filed</option>
+                            <option value="served">served</option>
+                            <option value="rejected">rejected</option>
+                          </select>
+                          <button
+                            onClick={() => updateStatus(f, editStatus)}
+                            className="rounded-md border border-amber-300/30 px-2 py-1 text-xs text-amber-100 hover:bg-amber-300/20"
+                          >
+                            Save
+                          </button>
+                          <button
+                            onClick={() => setEditingId(null)}
+                            className="rounded-md border border-white/10 px-2 py-1 text-xs text-white/70 hover:bg-white/10"
+                          >
+                            Cancel
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <span className="rounded-full border border-amber-300/30 bg-amber-300/10 px-2 py-1 text-xs text-amber-50">
+                            {f.status}
+                          </span>
+                          {!readOnly && (
+                            <>
+                              <button
+                                onClick={() => {
+                                  setEditingId(f.id);
+                                  setEditStatus(f.status);
+                                }}
+                                className="rounded-md border border-white/10 px-2 py-1 text-xs text-white/80 hover:bg-white/10"
+                              >
+                                Edit
+                              </button>
+                              <button
+                                onClick={() => remove(f)}
+                                className="rounded-md border border-white/10 px-2 py-1 text-xs text-white/60 hover:bg-red-500/20"
+                              >
+                                Delete
+                              </button>
+                            </>
+                          )}
+                        </>
+                      )}
+                    </div>
                   </div>
                 </li>
               ))}
@@ -161,7 +208,6 @@ export default function CaseFiling({
             <div className="space-y-1">
               <label className="text-xs text-white/70">Court</label>
               <input
-                title="Court"
                 value={court}
                 onChange={(e) => setCourt(e.target.value)}
                 disabled={!!readOnly}
@@ -171,15 +217,15 @@ export default function CaseFiling({
                   "focus:outline-none focus:ring-2 focus:ring-amber-300/30",
                   readOnly && "opacity-60"
                 )}
+                placeholder="e.g., County District Court"
               />
             </div>
 
             <div className="space-y-1">
               <label className="text-xs text-white/70">Status</label>
               <select
-                title="Status"
                 value={status}
-                onChange={(e) => setStatus(e.target.value as any)}
+                onChange={(e) => setStatus(e.target.value as FilingStatus)}
                 disabled={!!readOnly}
                 className={cx(
                   "w-full rounded-md border px-3 py-2 text-sm",
@@ -189,6 +235,7 @@ export default function CaseFiling({
                 )}
               >
                 <option value="draft">draft</option>
+                <option value="prepared">prepared</option>
                 <option value="filed">filed</option>
                 <option value="served">served</option>
                 <option value="rejected">rejected</option>
