@@ -15,6 +15,11 @@ export default function Footer() {
 
           <div className="flex flex-wrap gap-6 text-sm">
             <div className="flex flex-col gap-2">
+              <span className="text-xs font-medium text-white/80 uppercase tracking-wider">Learn</span>
+              <Link href="/blog" className="text-white/70 transition-colors hover:text-amber-300">The Litigation Architect</Link>
+              <Link href="/academy" className="text-white/70 transition-colors hover:text-amber-300">ProseIQ Academy</Link>
+            </div>
+            <div className="flex flex-col gap-2">
               <span className="text-xs font-medium text-white/80 uppercase tracking-wider">Legal</span>
               <Link href="/privacy" className="text-white/70 transition-colors hover:text-amber-300">Privacy Policy</Link>
               <Link href="/terms" className="text-white/70 transition-colors hover:text-amber-300">Terms of Service</Link>

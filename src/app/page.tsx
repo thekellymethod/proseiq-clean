@@ -1,6 +1,7 @@
 import AppHeader from "@/components/layout/AppHeader";
 import BackgroundFX from "@/components/marketing/BackgroundFX";
 import LandingHero from "@/components/marketing/LandingHero";
+import LandingThreeLayers from "@/components/marketing/LandingThreeLayers";
 import LandingProblem from "@/components/marketing/LandingProblem";
 import LandingSolution from "@/components/marketing/LandingSolution";
 import LandingFeatures from "@/components/marketing/LandingFeatures";
@@ -22,6 +23,7 @@ export default function HomePage() {
       <BackgroundFX />
       <AppHeader />
       <LandingHero />
+      <LandingThreeLayers />
       <LandingProblem />
       <LandingSolution />
       <LandingFeatures />

@@ -1,12 +1,17 @@
 import { createClient } from "@/utils/supabase/server";
 import { NextResponse } from "next/server";
 import { isProPlan } from "./plan";
+import { isAdminUser } from "./admin";
 
 export async function requireActiveSubscription() {
   const supabase = await createClient();
   const { data: auth } = await supabase.auth.getUser();
   if (!auth?.user) {
     return { supabase, user: null, res: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
+  }
+
+  if (isAdminUser(auth.user.email)) {
+    return { supabase, user: auth.user, res: null, plan: "pro" as const };
   }
 
   const { data: sub } = await supabase

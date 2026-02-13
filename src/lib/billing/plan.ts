@@ -1,4 +1,5 @@
 import { createClient } from "@/utils/supabase/server";
+import { isAdminUser } from "./admin";
 
 /**
  * Check if a subscription's price_id entitles the user to Pro features.
@@ -10,11 +11,14 @@ export function isProPlan(priceId: string | null | undefined): boolean {
 
 /**
  * Get the current user's plan from their subscription. Returns "pro" | "basic" | null.
+ * Admin users (ADMIN_EMAILS) always get "pro" and bypass subscription checks.
  */
 export async function getPlanForUser(): Promise<"pro" | "basic" | null> {
   const supabase = await createClient();
   const { data: auth } = await supabase.auth.getUser();
   if (!auth?.user) return null;
+
+  if (isAdminUser(auth.user.email)) return "pro";
 
   const { data: sub } = await supabase
     .from("billing_subscriptions")

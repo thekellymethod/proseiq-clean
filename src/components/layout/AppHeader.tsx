@@ -4,14 +4,19 @@ import { createClient } from "@/utils/supabase/server";
 
 type NavItem = { href: string; label: string };
 
-const NAV: NavItem[] = [
+// Always visible: Blog and Academy (thought leadership + training)
+const GLOBAL_NAV: NavItem[] = [
+  { href: "/blog", label: "The Litigation Architect" },
+  { href: "/academy", label: "ProseIQ Academy" },
+];
+
+const DASHBOARD_NAV: NavItem[] = [
   { href: "/dashboard", label: "Dashboard" },
   { href: "/dashboard/cases", label: "Cases" },
   { href: "/dashboard/research", label: "Research" },
   { href: "/dashboard/account", label: "Account" },
 ];
 
-// Show pricing link when not on dashboard (landing page)
 const LANDING_NAV: NavItem[] = [{ href: "/#pricing", label: "Pricing" }];
 
 export default async function AppHeader() {
@@ -46,7 +51,16 @@ export default async function AppHeader() {
         </div>
 
         <nav className="hidden md:flex items-center gap-2">
-          {(user ? NAV : LANDING_NAV).map((n) => (
+          {GLOBAL_NAV.map((n) => (
+            <Link
+              key={n.href}
+              href={n.href}
+              className="rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/70 transition-colors hover:bg-white/10 hover:text-white"
+            >
+              {n.label}
+            </Link>
+          ))}
+          {(user ? DASHBOARD_NAV : LANDING_NAV).map((n) => (
             <Link
               key={n.href}
               href={n.href}

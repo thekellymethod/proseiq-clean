@@ -37,7 +37,17 @@ In Stripe Dashboard → Developers → Webhooks:
 | Basic  | `STRIPE_PRICE_ID_BASIC` | $29/mo  | Case workspace, events, documents, exhibits, drafts, export, bundles, tasks |
 | Pro    | `STRIPE_PRICE_ID_PRO`   | $59/mo  | Basic + 3D timeline, legal research, AI Assistant, coaching tools |
 
-## 5. Gating Paid Features
+## 5. Admin Bypass
+
+Admin users bypass subscription restrictions and always receive Pro access.
+
+Set `ADMIN_EMAILS` in `.env.local` (comma-separated). Defaults to `test@lifearchitect.com` if unset:
+
+```bash
+ADMIN_EMAILS=test@lifearchitect.com,admin@example.com
+```
+
+## 6. Gating Paid Features
 
 Use `requireActiveSubscription()` from `@/lib/billing/requireActiveSub`:
 
@@ -56,3 +66,5 @@ if (sub.price_id === process.env.STRIPE_PRICE_ID_PRO) {
   // allow pro features
 }
 ```
+
+Admin users (see §5) automatically bypass these checks.
