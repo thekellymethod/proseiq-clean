@@ -22,7 +22,7 @@ async function verifyCaseAccess(caseId: string, userId: string) {
 
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string; filingId: string }> }) {
   const { user, res } = await requireUser();
-  if (res) return res;
+  if (res || !user) return res ?? NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { id: caseId, filingId } = await ctx.params;
   const ok = await verifyCaseAccess(caseId, user.id);
@@ -41,7 +41,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string; f
 
 export async function DELETE(_: Request, ctx: { params: Promise<{ id: string; filingId: string }> }) {
   const { user, res } = await requireUser();
-  if (res) return res;
+  if (res || !user) return res ?? NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { id: caseId, filingId } = await ctx.params;
   const ok = await verifyCaseAccess(caseId, user.id);

@@ -1,9 +1,6 @@
 "use client";
 
 import React from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Sparkles, BookOpen, Loader2, Plus, RefreshCw } from "lucide-react";
 
 type CaseData = {
@@ -77,9 +74,9 @@ Provide 5 relevant case law suggestions with:
   }, []);
 
   const strengthColors: Record<string, string> = {
-    high: "bg-green-100 text-green-700",
-    medium: "bg-amber-100 text-amber-700",
-    low: "bg-slate-100 text-slate-600",
+    high: "bg-emerald-500/20 text-emerald-200",
+    medium: "bg-amber-500/20 text-amber-200",
+    low: "bg-white/10 text-white/60",
   };
 
   const addToCaseLibrary = (suggestion: Suggestion) => {
@@ -91,72 +88,76 @@ Provide 5 relevant case law suggestions with:
   };
 
   return (
-    <Card className="border-0 shadow-sm">
-      <CardHeader className="border-b border-slate-100">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-lg flex items-center gap-2">
-            <Sparkles className="w-5 h-5 text-amber-500" />
-            AI-Suggested Case Law
-          </CardTitle>
-          <Button variant="outline" size="sm" onClick={generateSuggestions} disabled={loading}>
-            {loading ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <RefreshCw className="w-4 h-4" />
-            )}
-          </Button>
-        </div>
-      </CardHeader>
-      <CardContent className="p-6">
+    <div className="rounded-2xl border border-white/10 bg-white/5 overflow-hidden">
+      <div className="flex items-center justify-between gap-3 border-b border-white/10 p-4">
+        <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+          <Sparkles className="w-5 h-5 text-amber-500" />
+          AI-Suggested Case Law
+        </h3>
+        <button
+          type="button"
+          onClick={generateSuggestions}
+          disabled={loading}
+          className="rounded-md border border-white/10 bg-black/20 px-3 py-1.5 text-sm text-white/80 hover:bg-black/30 disabled:opacity-60"
+        >
+          {loading ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : (
+            <RefreshCw className="w-4 h-4" />
+          )}
+        </button>
+      </div>
+      <div className="p-4">
         {error ? (
-          <div className="mb-4 rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+          <div className="mb-4 rounded-lg border border-red-400/30 bg-red-500/10 p-3 text-sm text-red-100">
             {error}
           </div>
         ) : null}
         {loading && !suggestions ? (
-          <div className="text-center py-8 text-slate-500">
+          <div className="text-center py-8 text-white/60">
             <Loader2 className="w-8 h-8 animate-spin mx-auto mb-2" />
             <p>Analyzing case and researching relevant precedents...</p>
           </div>
         ) : suggestions && suggestions.length > 0 ? (
           <div className="space-y-4">
             {suggestions.map((suggestion, i) => (
-              <div key={i} className="bg-slate-50 rounded-lg p-4 hover:bg-slate-100 transition-colors">
+              <div key={i} className="rounded-xl border border-white/10 bg-black/10 p-4">
                 <div className="flex items-start justify-between gap-3 mb-2">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-2">
-                      <BookOpen className="w-4 h-4 text-blue-500" />
-                      <h4 className="font-semibold text-slate-900 text-sm">{suggestion.citation}</h4>
-                      <Badge className={strengthColors[suggestion.strength?.toLowerCase() || "medium"]}>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-2 flex-wrap">
+                      <BookOpen className="w-4 h-4 text-amber-400 shrink-0" />
+                      <h4 className="font-semibold text-white text-sm">{suggestion.citation}</h4>
+                      <span
+                        className={`rounded px-2 py-0.5 text-xs ${strengthColors[suggestion.strength?.toLowerCase() || "medium"]}`}
+                      >
                         {suggestion.strength}
-                      </Badge>
+                      </span>
                     </div>
-                    <p className="text-sm text-slate-700 mb-2">
+                    <p className="text-sm text-white/70 mb-2">
                       <span className="font-medium">Holding:</span> {suggestion.holding}
                     </p>
-                    <p className="text-sm text-slate-600">
+                    <p className="text-sm text-white/60">
                       <span className="font-medium">Relevance:</span> {suggestion.relevance}
                     </p>
                   </div>
-                  <Button
-                    size="sm"
-                    variant="outline"
+                  <button
+                    type="button"
                     onClick={() => addToCaseLibrary(suggestion)}
-                    className="flex-shrink-0"
+                    className="shrink-0 rounded-md border border-white/10 bg-black/20 px-2 py-1 text-xs text-white/80 hover:bg-black/30"
                   >
-                    <Plus className="w-4 h-4 mr-1" />
+                    <Plus className="w-4 h-4 inline mr-1" />
                     Add
-                  </Button>
+                  </button>
                 </div>
               </div>
             ))}
 
             {pinned.length > 0 ? (
               <div className="pt-2">
-                <div className="text-xs font-medium text-slate-600 mb-2">Pinned (session)</div>
+                <div className="text-xs font-medium text-white/60 mb-2">Pinned (session)</div>
                 <ul className="space-y-1">
                   {pinned.map((p, idx) => (
-                    <li key={idx} className="text-xs text-slate-700">
+                    <li key={idx} className="text-xs text-white/70">
                       {p.citation}
                     </li>
                   ))}
@@ -165,9 +166,9 @@ Provide 5 relevant case law suggestions with:
             ) : null}
           </div>
         ) : (
-          <p className="text-center text-slate-500 py-4">No suggestions available</p>
+          <p className="text-center text-white/60 py-4">No suggestions available</p>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }

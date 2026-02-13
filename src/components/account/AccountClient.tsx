@@ -195,16 +195,6 @@ export default function AccountClient({
                   Downgrade
                 </button>
               </>
-            ) : plan === "basic" ? (
-              <button
-                onClick={() => startCheckout("pro")}
-                disabled={busy}
-                className={cx(
-                  "rounded-md border border-amber-300/30 bg-amber-300/12 px-4 py-2.5 text-sm font-medium text-amber-100 hover:bg-amber-300/20 disabled:opacity-60"
-                )}
-              >
-                Upgrade to Pro – $59/mo
-              </button>
             ) : (
               <>
                 <button
