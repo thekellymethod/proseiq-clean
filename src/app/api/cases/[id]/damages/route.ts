@@ -22,7 +22,7 @@ async function verifyCaseAccess(caseId: string, userId: string) {
 
 export async function POST(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const { user, res } = await requireUser();
-  if (res) return res;
+  if (res || !user) return res ?? NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { id: caseId } = await ctx.params;
   const ok = await verifyCaseAccess(caseId, user.id);
