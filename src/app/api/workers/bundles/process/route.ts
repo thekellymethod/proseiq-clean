@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
+import { zipStore } from "@/lib/zip";
 
 async function requireUser() {
   const supabase = await createClient();
@@ -12,7 +13,7 @@ function bad(message: string, status = 400) {
   return NextResponse.json({ error: message }, { status });
 }
 
-async function mdToPlain(md: string) {
+function mdToPlain(md: string) {
   return String(md ?? "")
     .replace(/\r/g, "")
     .replace(/^#{1,6}\s+/gm, "")
@@ -40,45 +41,80 @@ export async function POST(req: Request) {
   // Mark processing
   await supabase.from("case_bundles").update({ status: "processing" }).eq("id", bundleId);
 
-  let JSZip: any;
-  try {
-    JSZip = (await import("jszip")).default;
-  } catch {
-    await supabase.from("case_bundles").update({ status: "error" }).eq("id", bundleId);
-    return bad("Missing dependency: jszip", 500);
+  const files: { name: string; data: Uint8Array }[] = [];
+  const enc = new TextEncoder();
+  const manifest = bundle.manifest ?? {};
+  const exhibitIds: string[] = Array.isArray(manifest.exhibit_ids) ? manifest.exhibit_ids : [];
+  const include: string[] = Array.isArray(manifest.include) ? manifest.include : ["documents", "exhibits", "drafts"];
+
+  files.push({ name: "manifest.json", data: enc.encode(JSON.stringify(manifest, null, 2)) });
+
+  // When exhibit_ids present: include only documents attached to those exhibits
+  let docIdsToInclude: string[] | null = null;
+  if (exhibitIds.length > 0) {
+    const { data: attachRows } = await supabase
+      .from("case_exhibit_documents")
+      .select("document_id")
+      .in("exhibit_id", exhibitIds);
+    docIdsToInclude = [...new Set((attachRows ?? []).map((r) => r.document_id))];
   }
 
-  const zip = new JSZip();
-  zip.file("manifest.json", JSON.stringify(bundle.manifest ?? {}, null, 2));
-
-  const include: string[] = Array.isArray(bundle.manifest?.include) ? bundle.manifest.include : ["documents", "exhibits", "drafts"];
-
-  // Documents
+  // Documents (app uses "documents" table)
   if (include.includes("documents")) {
-    const { data: docs } = await supabase
-      .from("case_documents")
+    let query = supabase
+      .from("documents")
       .select("id,filename,storage_bucket,storage_path,status")
       .eq("case_id", bundle.case_id)
+      .eq("created_by", user.id)
       .order("created_at", { ascending: true });
+    if (docIdsToInclude !== null) {
+      if (docIdsToInclude.length === 0) {
+        // No attached docs - skip documents section
+      } else {
+        query = query.in("id", docIdsToInclude);
+      }
+    }
+    const { data: docs } = docIdsToInclude?.length === 0 ? { data: [] } : await query;
 
     for (const d of docs ?? []) {
       if (!d.storage_bucket || !d.storage_path) continue;
       const { data: blob } = await supabase.storage.from(d.storage_bucket).download(d.storage_path);
       if (!blob) continue;
-      const buf = Buffer.from(await blob.arrayBuffer());
-      zip.folder("documents")?.file(d.filename || `${d.id}`, buf);
+      const buf = new Uint8Array(await blob.arrayBuffer());
+      const name = `documents/${d.filename || d.id}`;
+      files.push({ name, data: buf });
     }
   }
 
-  // Exhibits list (no stamping here)
+  // Exhibits list (scoped by exhibit_ids when present)
   if (include.includes("exhibits")) {
-    const { data: exhibits } = await supabase
+    let exhibitsQuery = supabase
       .from("case_exhibits")
-      .select("id,exhibit_index,exhibit_label,title,description")
+      .select("id,exhibit_no,label,title,description,exhibit_index,exhibit_label")
       .eq("case_id", bundle.case_id)
-      .order("exhibit_index", { ascending: true });
+      .order("sort_order", { ascending: true })
+      .order("exhibit_no", { ascending: true, nullsFirst: false });
+    if (exhibitIds.length > 0) {
+      exhibitsQuery = exhibitsQuery.in("id", exhibitIds);
+    }
+    const { data: exhibits } = await exhibitsQuery;
 
-    zip.file("exhibits.json", JSON.stringify(exhibits ?? [], null, 2));
+    const mapped = (exhibits ?? []).map((e) => ({
+      id: e.id,
+      exhibit_no: e.exhibit_no ?? e.exhibit_index,
+      label: e.label ?? e.exhibit_label ?? `Exhibit ${e.exhibit_no ?? e.exhibit_index}`,
+      title: e.title,
+      description: e.description ?? null,
+    }));
+    const sorted =
+      exhibitIds.length > 0
+        ? [...mapped].sort((a, b) => {
+            const ai = exhibitIds.indexOf(a.id);
+            const bi = exhibitIds.indexOf(b.id);
+            return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+          })
+        : mapped;
+    files.push({ name: "exhibits.json", data: enc.encode(JSON.stringify(sorted, null, 2)) });
   }
 
   // Drafts (plain text)
@@ -89,15 +125,14 @@ export async function POST(req: Request) {
       .eq("case_id", bundle.case_id)
       .order("updated_at", { ascending: false });
 
-    const folder = zip.folder("drafts");
     for (const dr of drafts ?? []) {
       const text = mdToPlain(dr.content_md ?? "");
       const safe = String(dr.title ?? dr.id).replace(/[^a-zA-Z0-9._-]/g, "_");
-      folder?.file(`${safe}.txt`, text);
+      files.push({ name: `drafts/${safe}.txt`, data: enc.encode(text) });
     }
   }
 
-  const zipBytes = await zip.generateAsync({ type: "nodebuffer" });
+  const zipBytes = Buffer.from(zipStore(files));
 
   const bucket = "case-files";
   const storagePath = `${user.id}/${bundle.case_id}/bundles/${bundle.id}.zip`;

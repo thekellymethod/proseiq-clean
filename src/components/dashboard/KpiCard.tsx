@@ -1,3 +1,4 @@
+//src/components/dashboard/KpiCard.tsx
 import React from "react";
 
 export default function KpiCard({

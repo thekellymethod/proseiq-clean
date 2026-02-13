@@ -31,7 +31,7 @@ export default function CaseTimeline({ caseId }: { caseId: string }) {
   async function load() {
     const res = await fetch(`/api/cases/${caseId}/events`, { cache: "no-store" });
     const j = await res.json();
-    setItems(j.items ?? []);
+    setItems(j.items ?? j.events ?? []);
   }
 
   React.useEffect(() => {
@@ -40,10 +40,11 @@ export default function CaseTimeline({ caseId }: { caseId: string }) {
   }, [caseId]);
 
   async function add() {
+    const eventAtIso = event_at ? new Date(event_at).toISOString() : "";
     const res = await fetch(`/api/cases/${caseId}/events`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ event_at, title, kind, notes: notes || null }),
+      body: JSON.stringify({ event_at: eventAtIso, title, kind, notes: notes || null }),
     });
     const j = await res.json();
     if (res.ok) {
@@ -56,10 +57,10 @@ export default function CaseTimeline({ caseId }: { caseId: string }) {
 
   async function saveEdit(e: Event) {
     setBusyId(e.id);
-    const res = await fetch(`/api/cases/${caseId}/events`, {
+    const res = await fetch(`/api/cases/${caseId}/events/${encodeURIComponent(e.id)}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: e.id, event_at: e.event_at, title: e.title, kind: e.kind, notes: e.notes }),
+      body: JSON.stringify({ event_at: e.event_at, title: e.title, kind: e.kind, notes: e.notes }),
     });
     const j = await res.json();
     if (res.ok) {
@@ -71,7 +72,7 @@ export default function CaseTimeline({ caseId }: { caseId: string }) {
 
   async function del(id: string) {
     setBusyId(id);
-    const res = await fetch(`/api/cases/${caseId}/events?eventId=${encodeURIComponent(id)}`, {
+    const res = await fetch(`/api/cases/${caseId}/events/${encodeURIComponent(id)}`, {
       method: "DELETE",
     });
     if (res.ok) setItems((p) => p.filter((x) => x.id !== id));

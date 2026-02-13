@@ -1,16 +1,11 @@
-import Template from "@/components/layout/Template";
+import { default as CaseDocuments } from "@/components/case/CaseDocuments";
 import CaseWorkspaceShell from "@/components/case/CaseWorkspaceShell";
-import CaseDocuments from "@/components/case/CaseDocuments";
-import { getCaseById } from "@/lib/cases";
 
-export default async function CaseDocumentsPage({ params }: { params: { id: string } }) {
-  const c = await getCaseById(params.id);
-
+export default async function CaseDocumentsPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   return (
-    <Template title={c.title} subtitle="Documents">
-      <CaseWorkspaceShell caseId={params.id} title={c.title} active="documents">
-        <CaseDocuments caseId={params.id} />
-      </CaseWorkspaceShell>
-    </Template>
+    <CaseWorkspaceShell caseId={id} active="documents">
+      <CaseDocuments params={{ caseId: id }} />
+    </CaseWorkspaceShell>
   );
 }

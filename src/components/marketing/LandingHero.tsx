@@ -1,109 +1,82 @@
 import Link from "next/link";
 import Image from "next/image";
+import { FadeIn } from "@/components/ui/SectionTransition";
 
 export default function LandingHero() {
   return (
-    <section className="mx-auto max-w-6xl px-4 pt-10 pb-8">
-      <div className="grid gap-8 lg:grid-cols-2 lg:items-center">
+    <section className="mx-auto max-w-6xl px-4 pt-16 pb-20 lg:pt-24 lg:pb-28">
+      <div className="grid gap-12 lg:grid-cols-2 lg:items-center">
         <div>
-          <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-white/70">
-            Pro se workflows • Court + arbitration • RLS-isolated accounts
-          </div>
+          <FadeIn delay={0}>
+            <h1 className="text-4xl font-semibold tracking-tight text-white sm:text-5xl">
+              Organize your case.
+              <br />
+              Meet your deadlines.
+              <br />
+              Be prepared for court.
+            </h1>
+          </FadeIn>
 
-          <h1 className="mt-4 text-4xl font-semibold tracking-tight text-white sm:text-5xl">
-            Turn intake into a case command center.
-          </h1>
+          <FadeIn delay={0.08}>
+            <p className="mt-6 text-base leading-relaxed text-white/75 max-w-lg">
+              ProseIQ gives self-represented litigants a structured system to manage filings, evidence, timelines, and drafting — in one secure workspace.
+            </p>
+          </FadeIn>
 
-          <p className="mt-4 text-base text-white/70">
-            ProseIQ converts your facts into structure: milestones, deadlines, exhibits, drafts, and export pipelines—
-            designed for people representing themselves who still want professional-grade organization.
-          </p>
-
-          <div className="mt-6 flex flex-wrap items-center gap-3">
-            <Link
-              href="/dashboard"
-              className="rounded-md border border-amber-300/30 bg-amber-300/10 px-4 py-2 text-sm font-medium text-amber-100 hover:bg-amber-300/20"
-            >
-              Enter the app
-            </Link>
-            <Link
-              href="/dashboard/cases/new"
-              className="rounded-md border border-white/10 bg-white/5 px-4 py-2 text-sm text-white/80 hover:bg-white/10"
-            >
-              Create a case
-            </Link>
-          </div>
-
-          <div className="mt-6 grid gap-3 sm:grid-cols-3">
-            <Metric label="Timeline" value="milestones + proof notes" />
-            <Metric label="Exhibits" value="labels + bundles" />
-            <Metric label="Drafting" value="structured sections" />
-          </div>
+          <FadeIn delay={0.16}>
+            <div className="mt-8 flex flex-wrap items-center gap-3">
+              <Link
+                href="/signup"
+                className="rounded-md border border-amber-300/30 bg-amber-300/12 px-5 py-2.5 text-sm font-medium text-amber-100 transition-colors hover:bg-amber-300/20"
+              >
+                Start free trial
+              </Link>
+              <Link
+                href="#pricing"
+                className="rounded-md border border-white/15 bg-white/5 px-5 py-2.5 text-sm text-white/80 transition-colors hover:bg-white/10 hover:text-white"
+              >
+                View pricing
+              </Link>
+              <Link
+                href="/blog"
+                className="rounded-md border border-white/15 bg-white/5 px-5 py-2.5 text-sm text-white/80 transition-colors hover:bg-white/10 hover:text-white"
+              >
+                The Litigation Architect
+              </Link>
+              <Link
+                href="/academy"
+                className="rounded-md border border-white/15 bg-white/5 px-5 py-2.5 text-sm text-white/80 transition-colors hover:bg-white/10 hover:text-white"
+              >
+                ProseIQ Academy
+              </Link>
+            </div>
+          </FadeIn>
         </div>
 
-        <div className="relative rounded-2xl border border-white/10 bg-white/5 p-6 overflow-hidden">
-          {/* glow blobs */}
-          <div className="pointer-events-none absolute -top-24 -right-24 h-72 w-72 rounded-full bg-amber-300/15 blur-3xl" />
-          <div className="pointer-events-none absolute -bottom-28 -left-20 h-80 w-80 rounded-full bg-sky-400/15 blur-3xl" />
-
-          <div className="relative flex items-center gap-4">
-            <div className="relative">
-              <div className="absolute -inset-3 rounded-3xl bg-gradient-to-br from-amber-300/25 via-white/5 to-sky-400/25 blur-lg opacity-80" />
-              <div className="relative rounded-2xl border border-white/10 bg-black/20 p-2">
+        <FadeIn delay={0.12}>
+          <div className="relative rounded-2xl border border-white/10 bg-white/[0.03] p-6 overflow-hidden">
+            <div className="pointer-events-none absolute -top-16 -right-16 h-48 w-48 rounded-full bg-amber-300/10 blur-2xl" />
+            <div className="relative flex flex-col items-center gap-6">
+              <div className="flex items-center justify-center gap-4">
                 <Image
-                  src="/proseiq-logo-512-a.png"
+                  src="/logo.PNG"
                   alt="ProseIQ"
-                  width={96}
-                  height={96}
+                  width={80}
+                  height={80}
                   priority
-                  className="rounded-xl"
+                  className="h-20 w-20 rounded-xl object-contain"
                 />
               </div>
-            </div>
-            <div>
-              <div className="text-white text-lg font-semibold">ProseIQ</div>
-              <div className="text-sm text-white/60">A case workspace you can actually use.</div>
-              <div className="mt-2 text-xs text-white/50">
-                Intake → Timeline → Exhibits → Drafts → Export
+              <div className="text-center">
+                <div className="text-sm font-medium text-white/90">Case Workspace</div>
+                <div className="mt-1 text-xs text-white/50">
+                  Intake → Timeline → Exhibits → Drafts → Export
+                </div>
               </div>
             </div>
           </div>
-
-          <div className="relative mt-6 space-y-3">
-            <PreviewCard title="Intake → Workspace">
-              Enter facts once. Generate a timeline, exhibit ladder, and drafting sections.
-            </PreviewCard>
-            <PreviewCard title="Deadlines + Events">
-              Track hearings, filings, reminders, and deadlines without a spreadsheet explosion.
-            </PreviewCard>
-            <PreviewCard title="Exhibits + Bundles">
-              Label exhibits, apply Bates stamps (pipeline), and export court-ready packets.
-            </PreviewCard>
-          </div>
-
-          <div className="relative mt-6 rounded-xl border border-white/10 bg-black/20 p-4 text-sm text-white/70">
-            Designed to monetize: neutral placeholders, templates, and per-user isolation via RLS.
-          </div>
-        </div>
+        </FadeIn>
       </div>
     </section>
-  );
-}
-
-function Metric({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-xl border border-white/10 bg-white/5 p-3">
-      <div className="text-xs text-white/60">{label}</div>
-      <div className="mt-1 text-sm font-medium text-white">{value}</div>
-    </div>
-  );
-}
-
-function PreviewCard({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div className="rounded-xl border border-white/10 bg-black/20 p-4">
-      <div className="text-sm font-medium text-white">{title}</div>
-      <div className="mt-1 text-sm text-white/70">{children}</div>
-    </div>
   );
 }

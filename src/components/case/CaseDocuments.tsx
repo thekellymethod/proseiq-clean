@@ -2,17 +2,19 @@
 "use client";
 
 import React from "react";
+import Link from "next/link";
+import { createClient as createSupabaseClient } from "@/utils/supabase/client";
 
 type DocRow = {
   id: string;
   filename: string;
-  content_type: string | null;
-  bytes: number | null;
+  mime_type: string | null;
+  byte_size: number | null;
   storage_bucket: string;
   storage_path: string;
   created_at: string;
-  notes: string | null;
-  tags: string[];
+  kind?: string | null;
+  status?: string;
 };
 
 async function jsonFetch(url: string, init?: RequestInit) {
@@ -42,7 +44,8 @@ function fmtDate(iso: string) {
   }
 }
 
-export default function CaseDocuments({ caseId }: { caseId: string }) {
+export default function CaseDocuments({ params }: { params: { caseId: string } }) {
+  const { caseId } = params;
   const [items, setItems] = React.useState<DocRow[]>([]);
   const [error, setError] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState(true);
@@ -69,61 +72,61 @@ export default function CaseDocuments({ caseId }: { caseId: string }) {
   async function uploadOne(file: File) {
     setError(null);
     setUploading(true);
+    let up: any = null;
     try {
-      const up = await jsonFetch(`/api/cases/${caseId}/documents/signed-upload`, {
+      up = await jsonFetch(`/api/cases/${caseId}/documents/upload`, {
         method: "POST",
-        body: JSON.stringify({ filename: file.name, content_type: file.type || "application/octet-stream", bytes: file.size }),
+        body: JSON.stringify({ filename: file.name, mime_type: file.type || "application/octet-stream", byte_size: file.size }),
       });
 
-      const putRes = await fetch(up.signedUrl, {
-        method: "PUT",
-        headers: { "Content-Type": file.type || "application/octet-stream" },
-        body: file,
-      });
+      const bucket = String(up?.upload?.bucket ?? "case-documents");
+      const path = String(up?.upload?.path ?? "");
+      const token = String(up?.upload?.token ?? "");
+      const signedUrl = String(up?.upload?.signedUrl ?? "");
 
-      if (!putRes.ok) {
-        const t = await putRes.text().catch(() => "");
-        throw new Error(`Upload failed (${putRes.status}): ${t.slice(0, 200)}`);
+      // Prefer Supabase's `uploadToSignedUrl()` flow (more reliable than raw fetch).
+      if (path && token) {
+        const supabase = createSupabaseClient();
+        const { error } = await supabase.storage.from(bucket).uploadToSignedUrl(path, token, file, {
+          contentType: file.type || "application/octet-stream",
+        });
+        if (error) throw new Error(error.message);
+      } else if (signedUrl) {
+        const putRes = await fetch(signedUrl, {
+          method: "PUT",
+          headers: { "Content-Type": file.type || "application/octet-stream" },
+          body: file,
+        });
+
+        if (!putRes.ok) {
+          const t = await putRes.text().catch(() => "");
+          throw new Error(`Upload failed (${putRes.status}): ${t.slice(0, 200)}`);
+        }
+      } else {
+        throw new Error("Upload failed: missing signed upload details");
       }
-
-      await jsonFetch(`/api/cases/${caseId}/documents`, {
-        method: "POST",
-        body: JSON.stringify({
-          filename: file.name,
-          content_type: file.type || "application/octet-stream",
-          bytes: file.size,
-          storage_bucket: up.bucket,
-          storage_path: up.path,
-          tags: [],
-          notes: null,
-        }),
-      });
 
       await refresh();
     } catch (e: any) {
+      // Best-effort cleanup: remove the DB record if we created one but failed uploading.
+      const createdId = up?.item?.id;
+      if (createdId) {
+        try {
+          await jsonFetch(`/api/cases/${caseId}/documents/${createdId}`, { method: "DELETE" });
+        } catch {
+          // ignore
+        }
+      }
       setError(e?.message ?? "Upload failed");
     } finally {
       setUploading(false);
     }
   }
 
-  async function download(docId: string) {
-    setError(null);
-    try {
-      const j = await jsonFetch(`/api/cases/${caseId}/documents/signed-url`, {
-        method: "POST",
-        body: JSON.stringify({ doc_id: docId }),
-      });
-      window.open(j.url, "_blank", "noopener,noreferrer");
-    } catch (e: any) {
-      setError(e?.message ?? "Failed");
-    }
-  }
-
   async function remove(docId: string) {
     setError(null);
     try {
-      await jsonFetch(`/api/cases/${caseId}/documents?doc_id=${encodeURIComponent(docId)}`, { method: "DELETE" });
+      await jsonFetch(`/api/cases/${caseId}/documents/${docId}`, { method: "DELETE" });
       setItems((p) => p.filter((x) => x.id !== docId));
     } catch (e: any) {
       setError(e?.message ?? "Failed");
@@ -144,6 +147,7 @@ export default function CaseDocuments({ caseId }: { caseId: string }) {
             <input
               type="file"
               className="hidden"
+              accept="application/pdf,.pdf,image/*,.png,.jpg,.jpeg,.gif,.webp,.doc,.docx,.txt"
               onChange={(e) => {
                 const f = e.target.files?.[0];
                 if (f) uploadOne(f);
@@ -175,15 +179,24 @@ export default function CaseDocuments({ caseId }: { caseId: string }) {
                 <div className="min-w-0">
                   <div className="text-sm font-medium text-white truncate">{d.filename}</div>
                   <div className="mt-1 text-xs text-white/60">
-                    {fmtBytes(d.bytes)} • {d.content_type || "unknown"} • {fmtDate(d.created_at)}
+                    {fmtBytes(d.byte_size)} • {d.mime_type || "unknown"} • {fmtDate(d.created_at)}
                   </div>
                   <div className="mt-2 text-xs text-white/50 font-mono truncate">{d.storage_path}</div>
                 </div>
 
                 <div className="shrink-0 flex gap-2">
-                  <button onClick={() => download(d.id)} className="rounded-md border border-white/10 bg-white/5 px-2 py-1 text-xs text-white/80 hover:bg-white/10">
+                  <Link
+                    href={`/dashboard/cases/${caseId}/documents/${d.id}`}
+                    className="rounded-md border border-white/10 bg-black/20 px-2 py-1 text-xs text-white/70 hover:bg-black/30"
+                  >
+                    View
+                  </Link>
+                  <a
+                    href={`/api/cases/${caseId}/documents/${d.id}/download`}
+                    className="rounded-md border border-white/10 bg-white/5 px-2 py-1 text-xs text-white/80 hover:bg-white/10"
+                  >
                     Download
-                  </button>
+                  </a>
                   <button onClick={() => remove(d.id)} className="rounded-md border border-white/10 bg-black/20 px-2 py-1 text-xs text-white/70 hover:bg-black/30">
                     Delete
                   </button>

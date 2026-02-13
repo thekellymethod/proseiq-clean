@@ -5,7 +5,7 @@ import React from "react";
 type Exhibit = {
   id: string;
   case_id: string;
-  exhibit_no: number;
+  sequence: number;
   label: string;
   title: string;
   description: string | null;
@@ -27,7 +27,14 @@ type Bundle = {
   bates_prefix: string | null;
   bates_start: number | null;
   output_path: string | null;
+  storage_path: string | null;
   error: string | null;
+};
+
+type Document = {
+  id: string;
+  filename: string;
+  status: string;
 };
 
 function cx(...s: Array<string | false | null | undefined>) {
@@ -73,6 +80,10 @@ export default function CaseExhibits({ caseId }: { caseId: string }) {
   const [batesPrefix, setBatesPrefix] = React.useState("C-");
   const [batesStart, setBatesStart] = React.useState("1");
   const [queueing, setQueueing] = React.useState(false);
+  const [processingId, setProcessingId] = React.useState<string | null>(null);
+  const [attachExhibitId, setAttachExhibitId] = React.useState<string | null>(null);
+  const [documents, setDocuments] = React.useState<Document[]>([]);
+  const [attachedIds, setAttachedIds] = React.useState<Record<string, string[]>>({});
 
   async function refreshAll() {
     setError(null);
@@ -214,6 +225,60 @@ export default function CaseExhibits({ caseId }: { caseId: string }) {
     }
   }
 
+  async function processBundle(bundleId: string) {
+    setError(null);
+    setProcessingId(bundleId);
+    try {
+      await jsonFetch("/api/workers/bundles/process", {
+        method: "POST",
+        body: JSON.stringify({ bundleId }),
+      });
+      await refreshAll();
+    } catch (e: any) {
+      setError(e?.message ?? "Failed");
+    } finally {
+      setProcessingId(null);
+    }
+  }
+
+  async function openAttach(e: Exhibit) {
+    setAttachExhibitId(e.id);
+    setError(null);
+    try {
+      const [docsRes, attRes] = await Promise.all([
+        jsonFetch(`/api/cases/${caseId}/documents`),
+        jsonFetch(`/api/cases/${caseId}/exhibits/${e.id}/attach`),
+      ]);
+      setDocuments(docsRes.items ?? []);
+      setAttachedIds((p) => ({ ...p, [e.id]: (attRes.items ?? []).map((d: any) => d.id) }));
+    } catch (err: any) {
+      setError(err?.message ?? "Failed to load");
+    }
+  }
+
+  async function attachDoc(exhibitId: string, docId: string) {
+    setError(null);
+    try {
+      await jsonFetch(`/api/cases/${caseId}/exhibits/${exhibitId}/attach`, {
+        method: "POST",
+        body: JSON.stringify({ docId }),
+      });
+      setAttachedIds((p) => ({ ...p, [exhibitId]: [...(p[exhibitId] ?? []), docId] }));
+    } catch (e: any) {
+      setError(e?.message ?? "Failed");
+    }
+  }
+
+  async function detachDoc(exhibitId: string, docId: string) {
+    setError(null);
+    try {
+      await jsonFetch(`/api/cases/${caseId}/exhibits/${exhibitId}/attach?docId=${encodeURIComponent(docId)}`, { method: "DELETE" });
+      setAttachedIds((p) => ({ ...p, [exhibitId]: (p[exhibitId] ?? []).filter((id) => id !== docId) }));
+    } catch (e: any) {
+      setError(e?.message ?? "Failed");
+    }
+  }
+
   return (
     <section className="rounded-2xl border border-white/10 bg-white/5 p-4">
       <div className="flex items-start justify-between gap-3">
@@ -311,6 +376,12 @@ export default function CaseExhibits({ caseId }: { caseId: string }) {
 
                     <div className="shrink-0 flex flex-col gap-2">
                       <button
+                        onClick={() => openAttach(e)}
+                        className="rounded-md border border-white/10 bg-white/5 px-2 py-1 text-xs text-white/80 hover:bg-white/10"
+                      >
+                        Attach doc
+                      </button>
+                      <button
                         onClick={() => loadForEdit(e)}
                         className="rounded-md border border-white/10 bg-white/5 px-2 py-1 text-xs text-white/80 hover:bg-white/10"
                       >
@@ -399,25 +470,35 @@ export default function CaseExhibits({ caseId }: { caseId: string }) {
                   {bundles.map((b) => (
                     <li key={b.id} className="rounded-xl border border-white/10 bg-black/20 p-3">
                       <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
+                        <div className="min-w-0 flex-1">
                           <div className="text-sm font-medium text-white truncate">{b.title}</div>
                           <div className="mt-1 text-xs text-white/60">
                             {b.status} • {fmt(b.created_at)}
                             {b.include_bates ? " • Bates" : ""}
                           </div>
-                          {b.output_path ? (
-                            <div className="mt-2 text-xs text-white/70">
-                              Output: <span className="font-mono">{b.output_path}</span>
-                            </div>
-                          ) : null}
                           {b.error ? (
                             <div className="mt-2 rounded-lg border border-red-400/30 bg-red-500/10 p-2 text-xs text-red-100">
                               {b.error}
                             </div>
                           ) : null}
                         </div>
-                        <div className="shrink-0 text-xs text-white/50 font-mono">
-                          {b.id.slice(0, 8)}
+                        <div className="shrink-0 flex flex-col gap-1 items-end">
+                          {b.status === "queued" ? (
+                            <button
+                              onClick={() => processBundle(b.id)}
+                              disabled={!!processingId}
+                              className="rounded-md border border-amber-300/30 bg-amber-300/12 px-2 py-1 text-xs text-amber-100 hover:bg-amber-300/20 disabled:opacity-60"
+                            >
+                              {processingId === b.id ? "Processing…" : "Process"}
+                            </button>
+                          ) : b.status === "ready" ? (
+                            <a
+                              href={`/api/cases/${caseId}/bundles/${b.id}/download`}
+                              className="rounded-md border border-amber-300/30 bg-amber-300/12 px-2 py-1 text-xs text-amber-100 hover:bg-amber-300/20 text-center"
+                            >
+                              Download
+                            </a>
+                          ) : null}
                         </div>
                       </div>
                     </li>
@@ -505,11 +586,56 @@ export default function CaseExhibits({ caseId }: { caseId: string }) {
             </button>
 
             <div className="rounded-xl border border-white/10 bg-black/20 p-3 text-xs text-white/60">
-              Next: attach files from Documents and generate signed URLs; then Bates stamping and PDF packet generation.
+              Attach documents to exhibits to include them in bundles when you queue and process.
             </div>
           </div>
         </div>
       </div>
+
+      {attachExhibitId ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => setAttachExhibitId(null)}>
+          <div className="max-h-[80vh] w-full max-w-md overflow-auto rounded-2xl border border-white/10 bg-zinc-900 p-4 shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between gap-2">
+              <h4 className="font-medium text-white">Attach document</h4>
+              <button
+                onClick={() => setAttachExhibitId(null)}
+                className="rounded border border-white/10 px-2 py-1 text-xs text-white/70 hover:bg-white/10"
+              >
+                Close
+              </button>
+            </div>
+            <div className="mt-3 max-h-64 overflow-y-auto space-y-2">
+              {documents.length === 0 ? (
+                <div className="text-sm text-white/60">No documents in this case.</div>
+              ) : (
+                documents.map((d) => {
+                  const attached = (attachedIds[attachExhibitId] ?? []).includes(d.id);
+                  return (
+                    <div key={d.id} className="flex items-center justify-between gap-2 rounded-lg border border-white/10 bg-black/20 p-2">
+                      <span className="truncate text-sm text-white">{d.filename}</span>
+                      {attached ? (
+                        <button
+                          onClick={() => detachDoc(attachExhibitId, d.id)}
+                          className="shrink-0 rounded border border-red-400/30 px-2 py-1 text-xs text-red-200 hover:bg-red-500/20"
+                        >
+                          Detach
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => attachDoc(attachExhibitId, d.id)}
+                          className="shrink-0 rounded border border-amber-300/30 px-2 py-1 text-xs text-amber-100 hover:bg-amber-300/20"
+                        >
+                          Attach
+                        </button>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }
