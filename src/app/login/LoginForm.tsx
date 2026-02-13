@@ -4,6 +4,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
+import { setSplashOnSignIn } from "@/components/dashboard/AuthSplashGate";
 
 export default function LoginForm() {
   const router = useRouter();
@@ -22,6 +23,7 @@ export default function LoginForm() {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
 
+      setSplashOnSignIn();
       router.replace("/dashboard");
       router.refresh();
     } catch (err: any) {

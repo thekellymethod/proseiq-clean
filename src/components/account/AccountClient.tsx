@@ -3,6 +3,7 @@
 import React from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
+import { setSplashOnSignOut } from "@/components/dashboard/AuthSplashGate";
 
 type UserLike = {
   id: string;
@@ -137,6 +138,7 @@ export default function AccountClient({
     setBusy(true);
     setError(null);
     try {
+      setSplashOnSignOut();
       await fetch("/api/auth/signout", { method: "POST" });
       router.replace("/");
       router.refresh();

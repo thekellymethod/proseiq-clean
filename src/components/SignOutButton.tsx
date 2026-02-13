@@ -2,11 +2,13 @@
 
 import { useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
+import { setSplashOnSignOut } from "@/components/dashboard/AuthSplashGate";
 
 export default function SignOutButton() {
   const router = useRouter();
 
   async function onSignOut() {
+    setSplashOnSignOut();
     const supabase = createClient();
     await supabase.auth.signOut();
     router.replace("/login");

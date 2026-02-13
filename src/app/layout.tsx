@@ -1,6 +1,7 @@
 import "./globals.css";
 import type { Metadata } from "next";
 import PageTransition from "@/components/ui/PageTransition";
+import AuthSplashGate from "@/components/dashboard/AuthSplashGate";
 
 export const metadata: Metadata = {
   title: {
@@ -15,6 +16,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <body className="min-h-screen bg-blue-500 text-white">
+        <AuthSplashGate />
         <PageTransition>{children}</PageTransition>
       </body>
     </html>
