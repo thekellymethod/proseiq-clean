@@ -1,6 +1,7 @@
 import Link from "next/link";
+import { getAcademyTiers } from "@/lib/content/academy";
 
-const TIERS = [
+const TIERS_FALLBACK = [
   {
     slug: "tier-1",
     title: "Tier I — Foundational Literacy",
@@ -45,7 +46,24 @@ const TIERS = [
   },
 ];
 
-export default function AcademyPage() {
+export default async function AcademyPage() {
+  const dbTiers = await getAcademyTiers();
+  const tiers = dbTiers && dbTiers.length > 0
+    ? await Promise.all(
+        dbTiers.map(async (t) => {
+          const { getAcademyModules } = await import("@/lib/content/academy");
+          const modules = await getAcademyModules(t.id);
+          return {
+            slug: t.slug,
+            title: t.title,
+            tagline: t.tagline ?? "",
+            pricing: t.pricing ?? "",
+            includes: Array.isArray(t.includes) ? t.includes : [],
+            modules: modules.map((m) => ({ slug: m.slug, title: m.title })),
+          };
+        })
+      )
+    : TIERS_FALLBACK;
   return (
     <article className="space-y-12">
       <header>
@@ -67,7 +85,7 @@ export default function AcademyPage() {
       </div>
 
       <div className="space-y-8">
-        {TIERS.map((t) => (
+        {tiers.map((t) => (
           <section
             key={t.slug}
             className="rounded-2xl border border-white/10 bg-white/5 p-6"

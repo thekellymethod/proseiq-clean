@@ -1,52 +1,23 @@
 import Link from "next/link";
+import { getBlogPillars } from "@/lib/content/blog";
 
-const PILLARS = [
-  {
-    slug: "procedural-foundations",
-    title: "Pillar I — Procedural Foundations",
-    tagline: "Analytical, educational, slightly elevated.",
-    topics: [
-      "Why cases fail before they are heard",
-      "The anatomy of a motion to dismiss",
-      "The psychology of judicial decision-making",
-      "Understanding jurisdiction before argument",
-    ],
-  },
-  {
-    slug: "strategic-positioning",
-    title: "Pillar II — Strategic Positioning",
-    tagline: "Strategist, not tutor.",
-    topics: [
-      "Framing issues for maximum leverage",
-      "Drafting with asymmetry in mind",
-      "Offensive vs defensive litigation thinking",
-      "How to evaluate settlement leverage",
-    ],
-  },
-  {
-    slug: "legal-literacy-access",
-    title: "Pillar III — Legal Literacy & Access",
-    tagline: "Philosophical credibility.",
-    topics: [
-      "The justice gap",
-      "Structural inequities in procedure",
-      "Technology in legal empowerment",
-      "AI's proper role in law",
-    ],
-  },
-  {
-    slug: "case-dissections",
-    title: "Pillar IV — Case Dissections",
-    tagline: "Applied intelligence.",
-    topics: [
-      "A failed complaint and why",
-      "A well-structured response and why it works",
-      "Tactical mistakes in evidence submission",
-    ],
-  },
+const PILLARS_FALLBACK = [
+  { slug: "procedural-foundations", title: "Pillar I — Procedural Foundations", tagline: "Analytical, educational, slightly elevated.", topics: ["Why cases fail before they are heard", "The anatomy of a motion to dismiss", "The psychology of judicial decision-making", "Understanding jurisdiction before argument"] },
+  { slug: "strategic-positioning", title: "Pillar II — Strategic Positioning", tagline: "Strategist, not tutor.", topics: ["Framing issues for maximum leverage", "Drafting with asymmetry in mind", "Offensive vs defensive litigation thinking", "How to evaluate settlement leverage"] },
+  { slug: "legal-literacy-access", title: "Pillar III — Legal Literacy & Access", tagline: "Philosophical credibility.", topics: ["The justice gap", "Structural inequities in procedure", "Technology in legal empowerment", "AI's proper role in law"] },
+  { slug: "case-dissections", title: "Pillar IV — Case Dissections", tagline: "Applied intelligence.", topics: ["A failed complaint and why", "A well-structured response and why it works", "Tactical mistakes in evidence submission"] },
 ];
 
-export default function BlogPage() {
+export default async function BlogPage() {
+  const dbPillars = await getBlogPillars();
+  const pillars = dbPillars && dbPillars.length > 0
+    ? dbPillars.map((p) => ({
+        slug: p.slug,
+        title: p.title,
+        tagline: p.tagline ?? "",
+        topics: Array.isArray(p.topics) ? p.topics : [],
+      }))
+    : PILLARS_FALLBACK;
   return (
     <article className="space-y-12">
       <header>
@@ -68,7 +39,7 @@ export default function BlogPage() {
       </div>
 
       <div className="grid gap-6 sm:grid-cols-2">
-        {PILLARS.map((p) => (
+        {pillars.map((p) => (
           <Link
             key={p.slug}
             href={`/blog/${p.slug}`}

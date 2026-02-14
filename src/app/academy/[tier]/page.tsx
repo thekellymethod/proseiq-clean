@@ -1,56 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-
-const TIERS: Record<
-  string,
-  {
-    title: string;
-    tagline: string;
-    modules: { slug: string; title: string; outcome?: string }[];
-    includes: string[];
-    pricing: string;
-  }
-> = {
-  "tier-1": {
-    title: "Tier I — Foundational Literacy",
-    tagline: "For beginners. Completion results in a Foundational Certificate.",
-    modules: [
-      { slug: "understanding-court-structure", title: "Understanding Court Structure" },
-      { slug: "civil-procedure-basics", title: "Civil Procedure Basics" },
-      { slug: "drafting-a-complaint", title: "Drafting a Complaint", outcome: "By the end, you will draft a procedurally compliant complaint." },
-      { slug: "responding-to-a-complaint", title: "Responding to a Complaint", outcome: "By the end, you will draft a procedurally compliant response." },
-      { slug: "deadlines-service", title: "Deadlines & Service" },
-    ],
-    includes: ["10–20 min structured lesson", "Downloadable checklist", "Structured template", "Practice scenario", "Self-assessment quiz"],
-    pricing: "Free or low cost",
-  },
-  "tier-2": {
-    title: "Tier II — Tactical Competence",
-    tagline: "From literacy to performance.",
-    modules: [
-      { slug: "motion-practice-architecture", title: "Motion Practice Architecture", outcome: "By the end, you will draft a procedurally compliant motion." },
-      { slug: "evidence-framing", title: "Evidence Framing" },
-      { slug: "affidavits-declarations", title: "Affidavits & Declarations" },
-      { slug: "discovery-strategy", title: "Discovery Strategy" },
-      { slug: "preserving-error", title: "Preserving Error" },
-    ],
-    includes: ["Motion drafting labs", "Redline examples (bad vs good)", "Devil's Advocate exercises"],
-    pricing: "Subscription",
-  },
-  "tier-3": {
-    title: "Tier III — Strategic Litigation",
-    tagline: "Advanced. Differentiate from random legal advice.",
-    modules: [
-      { slug: "case-mapping-timeline", title: "Case Mapping & Timeline Construction" },
-      { slug: "risk-analysis", title: "Risk Analysis" },
-      { slug: "settlement-leverage", title: "Settlement Leverage" },
-      { slug: "trial-preparation", title: "Trial Preparation Fundamentals" },
-      { slug: "appellate-awareness", title: "Appellate Awareness" },
-    ],
-    includes: ["Strategic frameworks", "Outcome-based modules"],
-    pricing: "Premium",
-  },
-};
+import { getAcademyTierBySlug, getAcademyModules } from "@/lib/content/academy";
 
 export default async function AcademyTierPage({
   params,
@@ -58,7 +8,23 @@ export default async function AcademyTierPage({
   params: Promise<{ tier: string }>;
 }) {
   const { tier } = await params;
-  const data = TIERS[tier];
+  const tierRow = await getAcademyTierBySlug(tier);
+  const modules = tierRow ? await getAcademyModules(tierRow.id) : [];
+
+  const data = tierRow
+    ? {
+        title: tierRow.title,
+        tagline: tierRow.tagline ?? "",
+        pricing: tierRow.pricing ?? "",
+        includes: Array.isArray(tierRow.includes) ? tierRow.includes : [],
+        modules: modules.map((m) => ({
+          slug: m.slug,
+          title: m.title,
+          outcome: m.outcome ?? undefined,
+        })),
+      }
+    : null;
+
   if (!data) notFound();
 
   return (
@@ -85,14 +51,17 @@ export default async function AcademyTierPage({
         </h2>
         <ul className="mt-4 space-y-3">
           {data.modules.map((m) => (
-            <li
-              key={m.slug}
-              className="rounded-lg border border-white/10 bg-black/10 px-4 py-3"
-            >
-              <div className="font-medium text-white">{m.title}</div>
-              {m.outcome && (
-                <div className="mt-1 text-sm text-amber-200/90">{m.outcome}</div>
-              )}
+            <li key={m.slug}>
+              <Link
+                href={`/academy/${tier}/${m.slug}`}
+                className="block rounded-lg border border-white/10 bg-black/10 px-4 py-3 transition-colors hover:bg-white/5 hover:border-amber-300/20"
+              >
+                <div className="font-medium text-white">{m.title}</div>
+                {m.outcome && (
+                  <div className="mt-1 text-sm text-amber-200/90">{m.outcome}</div>
+                )}
+                <span className="mt-2 inline-block text-xs text-amber-300/80">View module →</span>
+              </Link>
             </li>
           ))}
         </ul>
